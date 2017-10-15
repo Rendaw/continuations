@@ -66,40 +66,40 @@
     nbproject/build-impl.xml file. 
 
     -->
-   
+
     <tstamp>
         <format property="build.date" pattern="yyyy-MM-dd_hh-mm"/>
     </tstamp>
-    
+
     <target name="instrument-classes">
         <taskdef name="continuations"
-            classname="de.matthiasmann.continuations.instrument.InstrumentationTask"
-            classpath="${run.classpath}">
+                 classname="InstrumentationTask"
+                 classpath="${run.classpath}">
         </taskdef>
 
         <continuations verbose="true" check="true">
             <fileset dir="${build.classes.dir}"/>
         </continuations>
     </target>
-    
+
     <target name="build-full-jar" depends="instrument-classes">
         <jar jarfile="${dist.dir}/Continuations_full_${build.date}.jar"
-            basedir="${build.classes.dir}">
+             basedir="${build.classes.dir}">
             <manifest>
-                <attribute name="Premain-Class" value="de.matthiasmann.continuations.instrument.JavaAgent"/>
+                <attribute name="Premain-Class" value="JavaAgent"/>
             </manifest>
         </jar>
     </target>
-    
+
     <target name="build-runtime-jar" depends="instrument-classes">
         <jar jarfile="${dist.dir}/Continuations_runtime_${build.date}.jar"
-            basedir="${build.classes.dir}"
-            includes="de/matthiasmann/continuations/*.class"/>
+             basedir="${build.classes.dir}"
+             includes="de/matthiasmann/continuations/*.class"/>
     </target>
-    
+
     <target name="build-source-zip" depends="instrument-classes">
         <zip destfile="${dist.dir}/Continuations_src_${build.date}.zip"
-            basedir="." compress="true">
+             basedir="." compress="true">
             <include name="nbproject/**"/>
             <exclude name="nbproject/private/**"/>
             <include name="build.xml"/>
@@ -107,34 +107,34 @@
             <include name="${test.src.dir}/**"/>
         </zip>
     </target>
-    
+
     <target name="build-javadoc-zip" depends="javadoc">
         <zip destfile="${dist.dir}/Continuations_doc_${build.date}.zip"
-            basedir="." compress="true">
+             basedir="." compress="true">
             <include name="${dist.javadoc.dir}/**"/>
         </zip>
     </target>
-    
+
     <target name="-post-compile" depends="instrument-classes">
     </target>
-    
+
     <target name="-post-jar" depends="build-full-jar, build-runtime-jar, build-source-zip, build-javadoc-zip">
     </target>
-    
+
     <target name="instrument-tests">
         <taskdef name="continuations"
-            classname="de.matthiasmann.continuations.instrument.InstrumentationTask"
-            classpath="${run.classpath}">
+                 classname="InstrumentationTask"
+                 classpath="${run.classpath}">
         </taskdef>
 
         <continuations verbose="true" check="true" debug="true">
             <fileset dir="${build.test.classes.dir}"/>
         </continuations>
     </target>
-    
+
     <target name="-post-compile-test" depends="instrument-tests">
     </target>
-    
+
     <target name="-post-compile-test-single" depends="instrument-tests">
     </target>
 </project>

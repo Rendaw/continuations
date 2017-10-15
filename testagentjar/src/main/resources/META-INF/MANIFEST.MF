@@ -1,5 +1,5 @@
 Manifest-Version: 1.0
-Premain-Class: de.matthiasmann.continuations.instrument.JavaAgent
+Premain-Class: com.zarbosoft.coroutines.instrument.JavaAgent
 Can-Redefine-Classes: true
 Can-Retransform-Classes: true
 Can-Set-Native-Method-Prefix: true
