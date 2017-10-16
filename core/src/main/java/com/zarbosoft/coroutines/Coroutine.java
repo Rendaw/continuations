@@ -77,7 +77,8 @@ public class Coroutine implements Runnable, Serializable {
 	private State state;
 
 	/**
-	 * Suspend the currently running Coroutine on the calling thread.
+	 * Call from within an executing coroutine to suspend execution at that point - may not be called from outside
+	 * the coroutine.
 	 *
 	 * @throws SuspendExecution                This exception is used for control transfer - don't catch it !
 	 * @throws java.lang.IllegalStateException If not called from a Coroutine
@@ -156,9 +157,8 @@ public class Coroutine implements Runnable, Serializable {
 	}
 
 	/**
-	 * Runs the Coroutine until it is finished or suspended. This method must only
-	 * be called when the Coroutine is in the states NEW or SUSPENDED. It is not
-	 * multi threading safe.
+	 * Start or resume the coroutine - the coroutine must be in the states NEW or SUSPENDED.  The coroutine
+	 * code will execute in the current thread.  This function blocks until the coroutine is finished or suspended.
 	 *
 	 * @throws java.lang.IllegalStateException if the Coroutine is currently running or already finished.
 	 */
@@ -176,7 +176,6 @@ public class Coroutine implements Runnable, Serializable {
 			} catch (final SuspendExecution ex) {
 				assert ex == SuspendExecution.instance;
 				result = State.SUSPENDED;
-				//stack.dump();
 				stack.resumeStack();
 			}
 		} finally {

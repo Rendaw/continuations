@@ -113,11 +113,11 @@ public class JavaAgent {
 
 		db.setLog(new Log() {
 			public void log(final LogLevel level, final String msg, final Object... args) {
-				System.out.println("[Continuations] " + level + ": " + String.format(msg, args));
+				System.out.println("[Coroutines] " + level + ": " + String.format(msg, args));
 			}
 
 			public void error(final String msg, final Exception exc) {
-				System.out.println("[Continuations] ERROR: " + msg);
+				System.out.println("[Coroutines] ERROR: " + msg);
 
 				exc.printStackTrace(System.out);
 			}

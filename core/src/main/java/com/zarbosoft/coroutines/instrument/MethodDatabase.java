@@ -166,12 +166,12 @@ public class MethodDatabase implements Log {
 			return false;   // special methods are never suspendable
 		}
 
-		if (isJavaCore(className)) {
-			return false;
-		}
-
 		String curClassName = className;
 		do {
+			if (isJavaCore(curClassName)) {
+				return false;
+			}
+
 			ClassEntry entry = getClassEntry(curClassName);
 			if (entry == null) {
 				entry = CLASS_NOT_FOUND;
@@ -391,6 +391,7 @@ public class MethodDatabase implements Log {
 	public static boolean isJavaCore(final String className) {
 		return className.startsWith("java/") ||
 				className.startsWith("javax/") ||
+				className.startsWith("jdk/") ||
 				className.startsWith("sun/") ||
 				className.startsWith("com/sun/");
 	}
