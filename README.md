@@ -48,7 +48,7 @@ hi 2
 
 # Usage
 
-Classes and methods that can be suspended need to be modified to do the suspending.  This can either be done with
+Classes and methods that can be suspended need to be instrumented to do the suspending.  This can either be done with
 a Java agent at runtime, as each class is loaded, or at compile time with an instrumentation step.
 
 Compile time instrumentation is simpler since it has fewer moving parts and you can troubleshoot any assembly issues
@@ -114,7 +114,7 @@ Run your jar with:
 java -javaagent:/path/to/coroutines-1.0.0.jar -jar target/yourapp.jar
 ```
 
-In your IDE this may need to be the full path to the jar in your `~/.m2` directory.  In Maven you can use
+To run tests in Maven with the agent you can use
 
 ```
 <plugin>
@@ -140,17 +140,19 @@ In your IDE this may need to be the full path to the jar in your `~/.m2` directo
 </plugin>
 ```
 
-to use the agent when running tests, and something similar with the `maven-exec-plugin` if you use that for running your
- jar.
+You can use something similar with the `maven-exec-plugin` if you use that for running your jar normally.
 
 #### Note:
 
-It's possible to add the JavaAgent programmatically but I haven't tried it myself.  In this case you need to be careful
-that no classes to be instrumented are loaded until after installing the agent.
+It's possible to install the agent into the classloader programmatically but I haven't tried it myself.  In this case
+you need to be careful that no classes to be instrumented are loaded until after installing the agent.
 
 # History
+
 2017-: rendaw https://github.com/rendaw/coroutines
+
 2013-2017: https://github.com/buzden/continuations
+
 Copyright (c) 2008-2013, Matthias Mann
 * LICENSE: New BSD (http://directory.fsf.org/wiki/License:BSD_3Clause)
 * HOMEPAGE: http://www.matthiasmann.de/content/view/24/26/
