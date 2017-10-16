@@ -2,6 +2,9 @@
 
 Coroutines are methods that can be stopped at any place within and then resumed from that point.
 
+This uses org.ow2.asm 5.2 for instrumentation which currently supports up to Java 8 bytecode.  Java 9 class files,
+even when generated with a target JVM of 1.8, cannot be opened and instrumentation will fail.
+
 # Example
 
 ```
