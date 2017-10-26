@@ -28,18 +28,19 @@
  */
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
 import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * Check that a generic catch all does not affect the suspendtion of a method
  *
  * @author Matthias Mann
  */
-public class CatchTest extends TestCase implements CoroutineProto {
+public class CatchTest implements CoroutineProto {
 
 	private final ArrayList<String> results = new ArrayList<>();
 
@@ -54,7 +55,7 @@ public class CatchTest extends TestCase implements CoroutineProto {
 		results.add("not thrown");
 	}
 
-	public void coExecute() throws SuspendExecution {
+	public void run() throws SuspendExecution {
 		results.add("A");
 		Coroutine.yield();
 		try {

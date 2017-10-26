@@ -67,7 +67,7 @@ public class Coroutine implements Runnable, Serializable {
 		/**
 		 * The Coroutine has finished it's run method
 		 *
-		 * @see CoroutineProto#coExecute()
+		 * @see CoroutineProto#run()
 		 */
 		FINISHED
 	}
@@ -159,12 +159,10 @@ public class Coroutine implements Runnable, Serializable {
 	/**
 	 * Start or resume the coroutine - the coroutine must be in the states NEW or SUSPENDED.  The coroutine
 	 * code will execute in the current thread.  This function blocks until the coroutine is finished or suspended.
-	 *
-	 * @throws java.lang.IllegalStateException if the Coroutine is currently running or already finished.
 	 */
-	public void run() throws IllegalStateException {
+	public void run() {
 		if (state != State.NEW && state != State.SUSPENDED) {
-			throw new IllegalStateException("Not new or suspended");
+			throw new AssertionError("Coroutine is not new or suspended.");
 		}
 		State result = State.FINISHED;
 		final Stack oldStack = Stack.getStack();
@@ -172,7 +170,7 @@ public class Coroutine implements Runnable, Serializable {
 			state = State.RUNNING;
 			Stack.setStack(stack);
 			try {
-				proto.coExecute();
+				proto.run();
 			} catch (final SuspendExecution ex) {
 				assert ex == SuspendExecution.instance;
 				result = State.SUSPENDED;

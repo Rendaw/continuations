@@ -5,21 +5,22 @@
 
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
 import org.junit.Test;
 
 import java.util.ArrayList;
 
+import static org.junit.Assert.assertEquals;
+
 /**
  * @author mam
  */
-public class InheritTest extends TestCase {
+public class InheritTest {
 
 	@Test
 	public void testInherit() {
 		final C dut = new C();
 		final Coroutine c = new Coroutine(new CoroutineProto() {
-			public void coExecute() throws SuspendExecution {
+			public void run() throws SuspendExecution {
 				dut.myMethod();
 			}
 		});

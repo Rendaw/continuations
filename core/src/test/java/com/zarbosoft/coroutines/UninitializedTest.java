@@ -5,13 +5,14 @@
 
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * @author Matthias Mann
  */
-public class UninitializedTest extends TestCase implements CoroutineProto {
+public class UninitializedTest implements CoroutineProto {
 
 	Object result = "b";
 
@@ -27,7 +28,7 @@ public class UninitializedTest extends TestCase implements CoroutineProto {
 		assertEquals("a", result);
 	}
 
-	public void coExecute() throws SuspendExecution {
+	public void run() throws SuspendExecution {
 		result = getProperty();
 	}
 

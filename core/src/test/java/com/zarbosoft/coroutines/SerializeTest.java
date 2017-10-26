@@ -5,16 +5,17 @@
 
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
 import org.junit.Test;
 
 import java.io.*;
 import java.util.Iterator;
 
+import static org.junit.Assert.*;
+
 /**
  * @author Matthias Mann
  */
-public class SerializeTest extends TestCase {
+public class SerializeTest {
 
 	@Test
 	public void testSerialize() throws IOException, ClassNotFoundException {

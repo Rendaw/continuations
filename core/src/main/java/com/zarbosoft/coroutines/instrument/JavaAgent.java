@@ -152,6 +152,8 @@ public class JavaAgent {
 				final ProtectionDomain protectionDomain,
 				final byte[] classfileBuffer
 		) throws IllegalClassFormatException {
+			if (className == null)
+				return null;
 			if (MethodDatabase.isJavaCore(className)) {
 				return null;
 			}

@@ -28,21 +28,23 @@
  */
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
 import org.junit.Test;
 
 import java.util.ArrayList;
+
+import static junit.framework.TestCase.assertTrue;
+import static org.junit.Assert.assertEquals;
 
 /**
  * Test the propagation of unhandled exceptions throw a suspendable call
  *
  * @author Matthias Mann
  */
-public class ThrowTest extends TestCase implements CoroutineProto {
+public class ThrowTest implements CoroutineProto {
 
 	private final ArrayList<String> results = new ArrayList<>();
 
-	public void coExecute() throws SuspendExecution {
+	public void run() throws SuspendExecution {
 		results.add("A");
 		Coroutine.yield();
 		try {

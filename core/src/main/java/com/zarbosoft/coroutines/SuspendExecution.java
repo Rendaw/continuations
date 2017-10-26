@@ -43,7 +43,7 @@ package com.zarbosoft.coroutines;
  *
  * @author Matthias Mann
  */
-public final class SuspendExecution extends Exception {
+public final class SuspendExecution extends Throwable {
 
 	static final SuspendExecution instance = new SuspendExecution();
 

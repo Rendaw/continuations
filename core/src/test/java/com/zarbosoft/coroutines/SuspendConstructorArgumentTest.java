@@ -28,18 +28,20 @@
  */
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Iterator;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
 /**
  * Test to checking suspendable method calls as constructor parameters
  *
  * @author Matthias Mann
  */
-public class SuspendConstructorArgumentTest extends TestCase {
+public class SuspendConstructorArgumentTest {
 
 	@Test
 	public void testCalls() throws IOException {

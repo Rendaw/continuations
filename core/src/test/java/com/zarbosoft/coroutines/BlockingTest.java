@@ -29,7 +29,6 @@
 package com.zarbosoft.coroutines;
 
 import com.zarbosoft.coroutines.instrument.*;
-import junit.framework.TestCase;
 import org.junit.Test;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -40,13 +39,15 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.concurrent.locks.Lock;
 
+import static org.junit.Assert.assertTrue;
+
 /**
  * Test to checking blocking call detection
  *
  * @author Matthias Mann
  */
 @AlreadyInstrumented
-public class BlockingTest extends TestCase {
+public class BlockingTest {
 
 	@Test
 	public void testSuspend() throws IOException {

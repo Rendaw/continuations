@@ -5,13 +5,14 @@
 
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * @author Matthias Mann
  */
-public class DoubleTest extends TestCase implements CoroutineProto {
+public class DoubleTest implements CoroutineProto {
 
 	double result;
 
@@ -26,7 +27,7 @@ public class DoubleTest extends TestCase implements CoroutineProto {
 	}
 
 	@Override
-	public void coExecute() throws SuspendExecution {
+	public void run() throws SuspendExecution {
 		final double temp = Math.cos(0);
 		Coroutine.yield();
 		this.result = temp;

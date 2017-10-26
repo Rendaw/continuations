@@ -1,20 +1,14 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.zarbosoft.coroutines;
-
-import junit.framework.TestCase;
 
 /**
  * @author Matthias Mann
  */
-public class Merge3Test extends TestCase implements CoroutineProto {
+public class Merge3Test implements CoroutineProto {
 
 	public boolean a;
 	public boolean b;
 
-	public void coExecute() throws SuspendExecution {
+	public void run() throws SuspendExecution {
 		if (a) {
 			final Object[] arr = new Object[2];
 			System.out.println(arr);

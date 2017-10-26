@@ -1,17 +1,13 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * @author Matthias Mann
  */
-public class NullTest extends TestCase implements CoroutineProto {
+public class NullTest implements CoroutineProto {
 
 	Object result = "b";
 
@@ -27,7 +23,7 @@ public class NullTest extends TestCase implements CoroutineProto {
 		assertEquals("a", result);
 	}
 
-	public void coExecute() throws SuspendExecution {
+	public void run() throws SuspendExecution {
 		result = getProperty();
 	}
 

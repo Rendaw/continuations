@@ -111,7 +111,7 @@ public abstract class CoIterator<E> implements Iterator<E>, Serializable {
 	private class DelegateExecute implements CoroutineProto, Serializable {
 		private static final long serialVersionUID = 12784529515412L;
 
-		public void coExecute() throws SuspendExecution {
+		public void run() throws SuspendExecution {
 			CoIterator.this.run();
 		}
 	}

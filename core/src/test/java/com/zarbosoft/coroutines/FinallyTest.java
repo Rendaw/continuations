@@ -28,21 +28,22 @@
  */
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
 import org.junit.Test;
 
 import java.util.ArrayList;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * Test correct execution of a finally statement
  *
  * @author Matthias Mann
  */
-public class FinallyTest extends TestCase implements CoroutineProto {
+public class FinallyTest implements CoroutineProto {
 
 	private final ArrayList<String> results = new ArrayList<>();
 
-	public void coExecute() throws SuspendExecution {
+	public void run() throws SuspendExecution {
 		results.add("A");
 		Coroutine.yield();
 		try {

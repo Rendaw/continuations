@@ -1,15 +1,11 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author mam
  */
-public class Merge2Test extends TestCase implements CoroutineProto {
+public class Merge2Test implements CoroutineProto {
 
 	public interface Interface {
 		public void method();
@@ -22,7 +18,7 @@ public class Merge2Test extends TestCase implements CoroutineProto {
 	public static void suspendable() throws SuspendExecution {
 	}
 
-	public void coExecute() throws SuspendExecution {
+	public void run() throws SuspendExecution {
 		try {
 			final Interface iface = getInterface();
 			iface.method();

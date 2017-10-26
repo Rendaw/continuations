@@ -1,17 +1,11 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
 import org.junit.Test;
 
 /**
  * @author Elias Naur
  */
-public class InterfaceTest extends TestCase {
+public class InterfaceTest {
 
 	public class C2 implements SomeInterface {
 		public void doStuff() throws SuspendExecution {
@@ -42,7 +36,7 @@ public class InterfaceTest extends TestCase {
 	public void testSuspend() {
 		//		final I i = new C();
 		final Coroutine co = new Coroutine(new CoroutineProto() {
-			public final void coExecute() throws SuspendExecution {
+			public final void run() throws SuspendExecution {
 				// next line causes an error because of incomplete merge in TypeInterpreter
 				//SomeInterface i = System.currentTimeMillis() > 0 ? new C() : new C2();
 				final SomeInterface i = new C();

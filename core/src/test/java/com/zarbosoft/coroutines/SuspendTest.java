@@ -28,7 +28,6 @@
  */
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
 import org.junit.Test;
 
 /**
@@ -36,7 +35,7 @@ import org.junit.Test;
  *
  * @author Matthias Mann
  */
-public class SuspendTest extends TestCase implements CoroutineProto {
+public class SuspendTest implements CoroutineProto {
 
 	@Test
 	public void testSuspend() {
@@ -50,7 +49,7 @@ public class SuspendTest extends TestCase implements CoroutineProto {
 		System.out.println("State=" + co.getState());
 	}
 
-	public void coExecute() throws SuspendExecution {
+	public void run() throws SuspendExecution {
 		int i0 = 0, i1 = 1;
 		for (int j = 0; j < 10; j++) {
 			i1 = i1 + i0;

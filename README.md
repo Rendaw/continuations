@@ -7,6 +7,8 @@ even when generated with a target JVM of 1.8, cannot be opened and instrumentati
 
 Also note that currently calls via method references (like `MyClass::method`) and lambdas may cause issues.
 
+Source mapping isn't affected by coroutine instrumentation so debugging and trace line numbers should operate as normal.
+
 # Example
 
 ```

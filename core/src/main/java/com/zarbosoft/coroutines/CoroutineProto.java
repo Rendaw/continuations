@@ -46,6 +46,6 @@ public interface CoroutineProto {
 	 * @see Coroutine#run()
 	 * @see SuspendExecution
 	 */
-	public void coExecute() throws SuspendExecution;
+	public void run() throws SuspendExecution;
 
 }

@@ -5,12 +5,12 @@
 
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
+import static org.junit.Assert.assertEquals;
 
 /**
  * @author Matthias Mann
  */
-public class ArrayTest extends TestCase implements CoroutineProto {
+public class ArrayTest implements CoroutineProto {
 
 	private static final PatchLevel l1 = new PatchLevel();
 	private static final PatchLevel[] l2 = new PatchLevel[] {l1};
@@ -22,7 +22,7 @@ public class ArrayTest extends TestCase implements CoroutineProto {
 		assertEquals(42, l1.i);
 	}
 
-	public void coExecute() throws SuspendExecution {
+	public void run() throws SuspendExecution {
 		final PatchLevel[][] local_patch_levels = l3;
 		final PatchLevel patch_level = local_patch_levels[0][0];
 		patch_level.setLevel(42);

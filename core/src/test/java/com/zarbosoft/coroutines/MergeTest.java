@@ -4,7 +4,6 @@
  */
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
@@ -13,12 +12,12 @@ import java.io.IOException;
 /**
  * @author mam
  */
-public class MergeTest extends TestCase implements CoroutineProto {
+public class MergeTest implements CoroutineProto {
 
 	public static void throwsIO() throws IOException {
 	}
 
-	public void coExecute() throws SuspendExecution {
+	public void run() throws SuspendExecution {
 		try {
 			throwsIO();
 		} catch (final FileNotFoundException e) {

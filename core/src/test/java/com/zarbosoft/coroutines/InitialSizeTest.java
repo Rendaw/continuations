@@ -4,15 +4,17 @@
  */
 package com.zarbosoft.coroutines;
 
-import junit.framework.TestCase;
 import org.junit.Test;
 
 import java.lang.reflect.Field;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 /**
  * @author Matthias Mann
  */
-public class InitialSizeTest extends TestCase implements CoroutineProto {
+public class InitialSizeTest implements CoroutineProto {
 
 	@Test
 	public void test1() {
@@ -39,7 +41,7 @@ public class InitialSizeTest extends TestCase implements CoroutineProto {
 		assertTrue(getStackSize(c) > 10);
 	}
 
-	public void coExecute() throws SuspendExecution {
+	public void run() throws SuspendExecution {
 		assertEquals(3628800, factorial(10));
 	}
 
