@@ -66,7 +66,9 @@ IDE incremental compilation), but you need to pass the agent as a JVM argument w
 
 ## Compile time instrumentation
 
-In Maven, just add the following:
+#### In a single module project
+
+Add the following to your `pom.xml`:
 
 ```
 <plugin>
@@ -85,6 +87,71 @@ In Maven, just add the following:
 <plugin>
     <groupId>org.apache.maven.plugins</groupId>
     <artifactId>maven-antrun-plugin</artifactId>
+    <executions>
+        <execution>
+            <id>coroutines-instrument-classes</id>
+            <phase>compile</phase>
+            <configuration>
+                <tasks>
+                    <taskdef name="instrumentationTask"
+                             classname="com.zarbosoft.coroutines.instrument.InstrumentationTask"
+                             classpath="${maven.dependency.classpath}"/>
+                    <instrumentationTask>
+                        <fileset dir="${project.build.directory}/classes/" includes="**/*.class"/>
+                    </instrumentationTask>
+                </tasks>
+            </configuration>
+            <goals>
+                <goal>run</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
+```
+
+#### In a multi-module project
+
+To determine the coroutine inheritance and call hierarchy instrumentation must be done in one step (you can't instrument each module separately).  The following shows how to do this by unpacking dependencies that need to be instrumented (or all of them, to make things simpler) before the instrumentation step.
+
+If you don't want to combine all dependencies into your final jar, you can exclude/include classes to unpack in `maven-dependency-plugin`.
+
+Add the following to your `pom.xml`:
+
+```
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-dependency-plugin</artifactId>
+    <version>3.0.2</version>
+    <executions>
+        <execution>
+            <id>getClasspathFilenames</id>
+            <goals>
+                <goal>properties</goal>
+            </goals>
+        </execution>
+        <execution>
+            <id>unpack-dependencies</id>
+            <phase>compile</phase>
+            <goals>
+                <goal>unpack-dependencies</goal>
+            </goals>
+            <configuration>
+                <outputDirectory>${project.build.directory}/classes</outputDirectory>
+                <includeScope>runtime</includeScope>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-antrun-plugin</artifactId>
+    <dependencies>
+        <dependency>
+            <groupId>com.zarbosoft</groupId>
+            <artifactId>coroutines</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+    </dependencies>
     <executions>
         <execution>
             <id>coroutines-instrument-classes</id>
