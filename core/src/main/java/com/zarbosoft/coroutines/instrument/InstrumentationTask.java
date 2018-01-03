@@ -30,10 +30,10 @@ package com.zarbosoft.coroutines.instrument;
 
 import com.zarbosoft.coroutines.SuspendExecution;
 import org.apache.tools.ant.BuildException;
-import org.apache.tools.ant.DirectoryScanner;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.Task;
 import org.apache.tools.ant.types.FileSet;
+import org.apache.tools.ant.types.Resource;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -44,6 +44,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 
 /**
  * <p>Instrumentation ANT task</p>
@@ -138,6 +139,15 @@ public class InstrumentationTask extends Task {
 
 		try {
 			for (final FileSet fs : filesets) {
+				for (final Resource resource : new Iterable<Resource>() {
+					@Override
+					public Iterator<Resource> iterator() {
+						return fs.iterator();
+					}
+				}) {
+					db.checkClass(new File(fs.getDir(), resource.getName()));
+				}
+				/*
 				final DirectoryScanner ds = fs.getDirectoryScanner(getProject());
 				final String[] includedFiles = ds.getIncludedFiles();
 
@@ -151,6 +161,7 @@ public class InstrumentationTask extends Task {
 						}
 					}
 				}
+				*/
 			}
 
 			db.log(LogLevel.INFO, "Instrumenting " + db.getWorkList().size() + " classes");

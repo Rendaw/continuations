@@ -98,18 +98,36 @@ public class InstrumentMethod {
 				if (in.getType() == AbstractInsnNode.METHOD_INSN) {
 					final MethodInsnNode min = (MethodInsnNode) in;
 					final int opcode = min.getOpcode();
-					if (db.isMethodSuspendable(min.owner,
+					final boolean isReflectInvoke =
+							"java/lang/reflect/Method".equals(min.owner) && "invoke".equals(min.name);
+					if (isReflectInvoke || db.isMethodSuspendable(min.owner,
 							min.name,
 							min.desc,
 							opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKESTATIC
 					)) {
-						db.log(LogLevel.DEBUG,
-								"Method call at instruction %d to %s#%s%s is suspendable",
-								i,
-								min.owner,
-								min.name,
-								min.desc
-						);
+						if (isReflectInvoke) {
+							db.log(
+									LogLevel.DEBUG,
+									"Replacing reflect invoke method at instruction %d with wrapper; assumed suspendable",
+									i
+							);
+							// The wrapper has the same stack input as Method.invoke so all that needs to be done
+							// is replace the instruction with an invokestatic
+							mn.instructions.set(in, new MethodInsnNode(Opcodes.INVOKESTATIC,
+									"com/zarbosoft/coroutines/Coroutine",
+									"reflectInvoke",
+									"(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;",
+									false
+							));
+						} else {
+							db.log(LogLevel.DEBUG,
+									"Method call at instruction %d to %s#%s%s is suspendable",
+									i,
+									min.owner,
+									min.name,
+									min.desc
+							);
+						}
 						final FrameInfo fi = addCodeBlock(f, i);
 						splitTryCatch(fi);
 					} else {

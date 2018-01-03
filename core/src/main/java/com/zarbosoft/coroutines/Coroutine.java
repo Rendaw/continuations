@@ -30,6 +30,8 @@ package com.zarbosoft.coroutines;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 /**
  * <p>A Coroutine is used to run a CoroutineProto.</p>
@@ -197,6 +199,31 @@ public class Coroutine implements Runnable, Serializable {
 			return true;   // can't check
 		} catch (final Throwable ex) {
 			return true;    // it's just a check - make sure we don't fail if something goes wrong
+		}
+	}
+
+	/**
+	 * Extracts and rethrows SuspendExecutions that originate from inside reflect calls.  Automatically swapped in
+	 * in instrumentation.
+	 *
+	 * @param method
+	 * @param target
+	 * @param arguments
+	 * @return
+	 * @throws IllegalAccessException
+	 * @throws SuspendExecution
+	 * @throws InvocationTargetException
+	 */
+	public static Object reflectInvoke(
+			final Method method, final Object target, final Object... arguments
+	) throws IllegalAccessException, SuspendExecution, InvocationTargetException {
+		try {
+			return method.invoke(target, arguments);
+		} catch (final InvocationTargetException e) {
+			if (e.getCause() instanceof SuspendExecution)
+				throw (SuspendExecution) e.getCause();
+			else
+				throw e;
 		}
 	}
 }

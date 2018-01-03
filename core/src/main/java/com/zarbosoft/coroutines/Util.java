@@ -28,9 +28,6 @@
  */
 package com.zarbosoft.coroutines;
 
-/**
- * @author Matthias Mann
- */
 public class Util {
 
 	public static int[] copyOf(final int[] src, final int size) {
@@ -50,4 +47,5 @@ public class Util {
 		System.arraycopy(src, 0, dst, 0, Math.min(src.length, size));
 		return dst;
 	}
+
 }

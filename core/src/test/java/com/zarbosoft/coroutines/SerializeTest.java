@@ -8,60 +8,52 @@ package com.zarbosoft.coroutines;
 import org.junit.Test;
 
 import java.io.*;
-import java.util.Iterator;
 
-import static org.junit.Assert.*;
+import static com.zarbosoft.coroutines.Coroutine.State.FINISHED;
+import static org.hamcrest.core.IsEqual.equalTo;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertThat;
 
-/**
- * @author Matthias Mann
- */
 public class SerializeTest {
+	static class TestCoroutineProto implements CoroutineProto, Serializable {
+		private static final long serialVersionUID = 351278561540L;
+		int value = 0;
+
+		@Override
+		public void run() throws SuspendExecution {
+			value = 1;
+			Coroutine.yield();
+			value = 2;
+		}
+	}
 
 	@Test
 	public void testSerialize() throws IOException, ClassNotFoundException {
-		final Iterator<String> iter1 = new TestIterator();
 
-		assertEquals("A", iter1.next());
-		assertEquals("B", iter1.next());
-		assertEquals("C0", iter1.next());
-		assertEquals("C1", iter1.next());
+		final TestCoroutineProto proto = new TestCoroutineProto();
+		final Coroutine coroutine = new Coroutine(proto);
 
+		coroutine.run();
+		assertThat(proto.value, equalTo(1));
 		final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		final ObjectOutputStream oos = new ObjectOutputStream(baos);
-		oos.writeObject(iter1);
-		oos.close();
-
-		final byte[] bytes = baos.toByteArray();
-
-		final ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-		final ObjectInputStream ois = new ObjectInputStream(bais);
-		final Iterator<String> iter2 = (Iterator<String>) ois.readObject();
-
-		assertNotSame(iter1, iter2);
-
-		assertEquals("C2", iter2.next());
-		assertEquals("C3", iter2.next());
-		assertEquals("D", iter2.next());
-		assertEquals("E", iter2.next());
-		assertFalse(iter2.hasNext());
-
-		assertEquals("C2", iter1.next());
-		assertEquals("C3", iter1.next());
-		assertEquals("D", iter1.next());
-		assertEquals("E", iter1.next());
-		assertFalse(iter1.hasNext());
-	}
-
-	private static class TestIterator extends CoIterator<String> implements Serializable {
-		@Override
-		protected void run() throws SuspendExecution {
-			produce("A");
-			produce("B");
-			for (int i = 0; i < 4; i++) {
-				produce("C" + i);
-			}
-			produce("D");
-			produce("E");
+		{
+			final ObjectOutputStream oos = new ObjectOutputStream(baos);
+			oos.writeObject(coroutine);
+			oos.close();
 		}
+		final Coroutine coroutine2;
+		{
+			final byte[] bytes = baos.toByteArray();
+			final ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+			final ObjectInputStream ois = new ObjectInputStream(bais);
+			coroutine2 = (Coroutine) ois.readObject();
+		}
+
+		assertNotSame(coroutine, coroutine2);
+		assertNotSame(coroutine.getProto(), coroutine2.getProto());
+
+		coroutine2.run();
+		assertThat(((TestCoroutineProto) coroutine2.getProto()).value, equalTo(2));
+		assertThat(coroutine2.getState(), equalTo(FINISHED));
 	}
 }
