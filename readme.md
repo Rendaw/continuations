@@ -1,9 +1,8 @@
 # coroutines
 
-Coroutines are methods that can be stopped at any place within and then resumed from that point.
+Coroutines are methods that can be stopped at any place within and then resumed from that point.  They are often used as lightweight threads, switching between activities in a single thread when an activity needs to wait for something like disk reads or network data to arrive.
 
-This uses org.ow2.asm 5.2 for instrumentation which currently supports up to Java 8 bytecode.  Java 9 class files,
-even when generated with a target JVM of 1.8, cannot be opened and instrumentation will fail.
+This uses org.ow2.asm 5.2 for instrumentation which currently supports up to Java 8 bytecode.  Java 9 class files, even when generated with a target JVM of 1.8, cannot be opened and instrumentation will fail.
 
 Also note that currently calls via method references (like `MyClass::method`) and lambdas may cause issues.
 
@@ -35,7 +34,7 @@ public static void main(final String[] args) throws Exception {
     new Coroutine(new CoroutineProto() {
         @Override
         public void coExecute() throws SuspendExecution {
-            for (int i = 0; i < 10; ++i) {
+            for (int i = 0; i < 3; ++i) {
                 System.out.format("hi %s\n", i);
                 sleep(worker, 1, TimeUnit.SECONDS);
             }
@@ -55,14 +54,11 @@ hi 2
 
 # Usage
 
-Classes and methods that can be suspended need to be instrumented to do the suspending.  This can either be done with
-a Java agent at runtime, as each class is loaded, or at compile time with an instrumentation step.
+Classes and methods that can be suspended need to be instrumented.  This can either be done with a Java agent at runtime, as each class is loaded, or at compile time with an instrumentation step.
 
-Compile time instrumentation is simpler since it has fewer moving parts and you can troubleshoot any assembly issues
-before distribution.
+Compile time instrumentation is simpler since it has fewer moving parts and you can troubleshoot any assembly issues before distribution.
 
-Runtime instrumentation is more flexible - it can deal with code hotswaps and non-Maven build environments (like
-IDE incremental compilation), but you need to pass the agent as a JVM argument whenever you execute the code.
+Runtime instrumentation is more flexible - it can deal with code hotswaps and non-Maven build environments (like IDE incremental compilation), but you need to pass the agent as a JVM argument whenever you execute the code.
 
 ## Compile time instrumentation
 
@@ -181,12 +177,7 @@ There are three requirements for runtime instrumentation:
 2. You have a jar with a `META-INF/MANIFEST.MF` file with the line `Premain-Class: com.zarbosoft.coroutines.instrument.JavaAgent`
 3. You start the JVM with `java -javaagent:/requirement/2/jar.jar -jar target/yourapp.jar`
 
-Since 1 and 2 are handled by the Coroutines jar, all you have to do is add the `-javaagent` argument.
-
-Run your jar with:
-```
-java -javaagent:/path/to/coroutines-1.0.0.jar -jar target/yourapp.jar
-```
+Since 1 and 2 are handled by the Coroutines jar, all you have to do is add the `-javaagent` argument and specify the same jar in both locations for 3.
 
 To run tests in Maven with the agent you can use
 
@@ -214,14 +205,22 @@ To run tests in Maven with the agent you can use
 </plugin>
 ```
 
-You can use something similar with the `maven-exec-plugin` if you use that for running your jar normally.
+You can use something similar with the `maven-exec-plugin` if you use that for running your jar normally.  You may have to add the `-javaagent` to your run configuration separately if you're using an IDE.
 
 #### Note:
 
-It's possible to install the agent into the classloader programmatically but I haven't tried it myself.  In this case
-you need to be careful that no classes to be instrumented are loaded until after installing the agent.
+It's possible to install the agent into the classloader programmatically but I haven't tried it myself.  In this case you need to be careful that no classes to be instrumented are loaded until after installing the agent.
+
+# How it works
+
+1. During suspendable method execution, every stack change (local created, local de-scoped) is mirrored in a thread-local coroutine `Stack` class.
+2. `Coroutine.yield()` records the position (instruction index) then raises `SuspendException`.  The stack unwinds normally back to the method that called `coroutine.run`, where normal flow continues.  The stack before yielding is still stored in the coroutine's `Stack`.
+3. Instrumentation adds a jump table to each suspendable call to each suspendable method.
+4. Resuming the coroutine calls the root function again.  Each function in the previous is re-entered via the jump table at the start of the caller function, and the final jump table moves the instruction pointer to directly after the `yield` call.
 
 # History
+
+This is fairly barebones, and I stripped out some classes (Coiterator) to make it even moreso.  I hope that more fully-featured toolkits and integrations with libraries such as Xnio can use this as a base, and if a better implementation comes out by keeping this small it will be easy to replace.
 
 2017-: rendaw https://github.com/rendaw/coroutines
 

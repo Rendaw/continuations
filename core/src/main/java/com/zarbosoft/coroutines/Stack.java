@@ -123,9 +123,9 @@ public final class Stack implements Serializable {
 	}
 
 	/**
-	 * called at the begin of a method
+	 * Returns the jump table entry for the next method on the stack when resuming a coroutine.
 	 *
-	 * @return the entry point of this method
+	 * @return the jump table entry index of the current method at the time of suspension
 	 */
 	public final int nextMethodEntry() {
 		int idx = methodTOS;
