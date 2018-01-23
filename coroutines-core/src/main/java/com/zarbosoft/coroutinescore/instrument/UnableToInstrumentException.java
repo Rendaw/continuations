@@ -31,7 +31,6 @@ package com.zarbosoft.coroutinescore.instrument;
 /**
  * <p>This exception is thrown when an unsupported construct was found in a class
  * that must be instrumented for suspension.</p>
- * <p>
  * <p>Note: this needs to be a RuntimeException - otherwise it can't be thrown
  * from {@link CheckInstrumentationVisitor}.</p>
  *

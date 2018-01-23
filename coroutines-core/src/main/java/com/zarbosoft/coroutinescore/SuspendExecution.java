@@ -35,7 +35,7 @@ package com.zarbosoft.coroutinescore;
  * <p>Methods which are declared to throw this exception are "suspendable". This
  * exception must always be propagated and never be caught.</p>
  * <p>
- * <p>Generic try/catch handlers are allowed:<br/>
+ * <p>Generic try/catch handlers are allowed:<br>
  * {@code try{ doSomething(); } catch(Throwable ex) { handleException(ex); } }</p>
  * <p>
  * <p>The instrumentation ANT task will enhance the bytecode of these methods to

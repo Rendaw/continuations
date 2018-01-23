@@ -48,20 +48,19 @@ import java.util.Iterator;
 
 /**
  * <p>Instrumentation ANT task</p>
- * <p>
  * <p>It requires one or more FileSet elements pointing to class files that should
  * be instrumented.</p>
  * <p>Classes that are referenced from the instrumented classes are searched in
  * the classpath of the task. If a referenced class is not found a warning is
  * generated and the instrumentation will result in less efficent code.</p>
- * <p>
- * <p>The following options can be set:<ul>
- * <li>check - default: false<br/>The resulting code is run through a verifier.</li>
- * <li>verbose - default: false<br/>The name of each processed class and all suspendable method calles is displayed.</li>
- * <li>debug - default: false<br/>Prints internal debugging information.</li>
- * <li>allowmonitors - default: false<br/>Allows the use of synchronized statements - this is DANGEROUS !</li>
- * <li>allowblocking - default: false<br/>Allows the use known blocking calls like Thread.sleep, Object.wait etc.</li>
- * </ul></p>
+ * <p>The following options can be set:</p>
+ * <ul>
+ * <li>check - default: false<br>The resulting code is run through a verifier.</li>
+ * <li>verbose - default: false<br>The name of each processed class and all suspendable method calles is displayed.</li>
+ * <li>debug - default: false<br>Prints internal debugging information.</li>
+ * <li>allowmonitors - default: false<br>Allows the use of synchronized statements - this is DANGEROUS !</li>
+ * <li>allowblocking - default: false<br>Allows the use known blocking calls like Thread.sleep, Object.wait etc.</li>
+ * </ul>
  *
  * @author Matthias Mann
  * @see <a href="http://ant.apache.org/manual/CoreTypes/fileset.html">ANT FileSet</a>

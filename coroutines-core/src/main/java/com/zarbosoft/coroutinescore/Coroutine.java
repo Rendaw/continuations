@@ -36,7 +36,6 @@ import java.lang.reflect.Method;
 /**
  * <p>A Coroutine is used to run a CoroutineProto.</p>
  * <p>It also provides a function to suspend a running Coroutine.</p>
- * <p>
  * <p>A Coroutine can be serialized if it's not running and all involved
  * classes and data types are also {@link Serializable}.</p>
  *
@@ -146,7 +145,6 @@ public class Coroutine implements Runnable, Serializable {
 	/**
 	 * <p>Returns the current state of this Coroutine. May be called by the Coroutine
 	 * itself but should not be called by another thread.</p>
-	 * <p>
 	 * <p>The Coroutine starts in the state NEW then changes to RUNNING. From
 	 * RUNNING it may change to FINISHED or SUSPENDED. SUSPENDED can only change
 	 * to RUNNING by calling run() again.</p>
