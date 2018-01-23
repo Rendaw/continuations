@@ -42,7 +42,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.20.1</version>
                 <configuration>
-                    <argLine>-javaagent:${com.zarbosoft:coroutines-testagentjar:jar}</argLine>
+                    <argLine>-javaagent:${com.zarbosoft:coroutines-core-testagentjar:jar}</argLine>
                 </configuration>
             </plugin>
             <plugin>

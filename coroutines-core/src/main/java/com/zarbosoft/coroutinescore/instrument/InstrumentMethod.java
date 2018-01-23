@@ -114,7 +114,7 @@ public class InstrumentMethod {
 							// The wrapper has the same stack input as Method.invoke so all that needs to be done
 							// is replace the instruction with an invokestatic
 							mn.instructions.set(in, new MethodInsnNode(Opcodes.INVOKESTATIC,
-									"com/zarbosoft/coroutines/Coroutine",
+									"com/zarbosoft/coroutinescore/Coroutine",
 									"reflectInvoke",
 									"(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;",
 									false

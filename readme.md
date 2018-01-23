@@ -146,7 +146,7 @@ Add the following to your `pom.xml`:
     <dependencies>
         <dependency>
             <groupId>com.zarbosoft</groupId>
-            <artifactId>coroutines</artifactId>
+            <artifactId>coroutinescore</artifactId>
             <version>1.0.0</version>
         </dependency>
     </dependencies>
@@ -202,7 +202,7 @@ To run tests in Maven with the agent you can use
     <artifactId>maven-surefire-plugin</artifactId>
     <version>2.20.1</version>
     <configuration>
-        <argLine>-javaagent:${com.zarbosoft:coroutines:jar}</argLine>
+        <argLine>-javaagent:${com.zarbosoft:coroutines-core:jar}</argLine>
     </configuration>
 </plugin>
 ```
