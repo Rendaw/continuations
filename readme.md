@@ -8,6 +8,8 @@ Also note that currently calls via method references (like `MyClass::method`) an
 
 Source mapping isn't affected by coroutine instrumentation so debugging and trace line numbers should operate as normal.
 
+Coroutines are serializable.
+
 # Example
 
 ```
@@ -90,7 +92,7 @@ Add the following to your `pom.xml`:
             <configuration>
                 <tasks>
                     <taskdef name="instrumentationTask"
-                             classname="com.zarbosoft.coroutines.instrument.InstrumentationTask"
+                             classname="com.zarbosoft.coroutinescore.instrument.InstrumentationTask"
                              classpath="${maven.dependency.classpath}"/>
                     <instrumentationTask>
                         <fileset dir="${project.build.directory}/classes/" includes="**/*.class"/>
@@ -155,7 +157,7 @@ Add the following to your `pom.xml`:
             <configuration>
                 <tasks>
                     <taskdef name="instrumentationTask"
-                             classname="com.zarbosoft.coroutines.instrument.InstrumentationTask"
+                             classname="com.zarbosoft.coroutinescore.instrument.InstrumentationTask"
                              classpath="${maven.dependency.classpath}"/>
                     <instrumentationTask>
                         <fileset dir="${project.build.directory}/classes/" includes="**/*.class"/>
@@ -173,8 +175,8 @@ Add the following to your `pom.xml`:
 ## Runtime instrumentation
 
 There are three requirements for runtime instrumentation:
-1. `com.zarbosoft.coroutines.instrument.JavaAgent` is in your classpath, probably by adding it as a dependency
-2. You have a jar with a `META-INF/MANIFEST.MF` file with the line `Premain-Class: com.zarbosoft.coroutines.instrument.JavaAgent`
+1. `com.zarbosoft.coroutinescore.instrument.JavaAgent` is in your classpath, probably by adding it as a dependency
+2. You have a jar with a `META-INF/MANIFEST.MF` file with the line `Premain-Class: com.zarbosoft.coroutinescore.instrument.JavaAgent`
 3. You start the JVM with `java -javaagent:/requirement/2/jar.jar -jar target/yourapp.jar`
 
 Since 1 and 2 are handled by the Coroutines jar, all you have to do is add the `-javaagent` argument and specify the same jar in both locations for 3.
