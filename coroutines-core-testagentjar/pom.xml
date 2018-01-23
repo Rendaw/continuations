@@ -6,11 +6,11 @@
 
     <groupId>com.zarbosoft</groupId>
     <artifactId>coroutines-core-testagentjar</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.2</version>
     <parent>
         <groupId>com.zarbosoft</groupId>
         <artifactId>coroutines-core-parent</artifactId>
-        <version>0.0.1</version>
+        <version>0.0.2</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <build>
