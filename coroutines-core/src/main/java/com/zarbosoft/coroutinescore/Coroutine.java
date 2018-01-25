@@ -28,6 +28,8 @@
  */
 package com.zarbosoft.coroutinescore;
 
+import com.zarbosoft.coroutinescore.instrument.Stack;
+
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
@@ -68,12 +70,12 @@ public class Coroutine implements Runnable, Serializable {
 		/**
 		 * The Coroutine has finished it's run method
 		 *
-		 * @see CoroutineProto#run()
+		 * @see SuspendableRunnable#run()
 		 */
 		FINISHED
 	}
 
-	private final CoroutineProto proto;
+	public final SuspendableRunnable runnable;
 	private final Stack stack;
 	private State state;
 
@@ -93,10 +95,10 @@ public class Coroutine implements Runnable, Serializable {
 	 * can be used in several Coroutines at the same time - but then the normal
 	 * multi threading rules apply to the member state.
 	 *
-	 * @param proto the CoroutineProto for the Coroutine.
+	 * @param runnable the CoroutineProto for the Coroutine.
 	 */
-	public Coroutine(final CoroutineProto proto) {
-		this(proto, DEFAULT_STACK_SIZE);
+	public Coroutine(final SuspendableRunnable runnable) {
+		this(runnable, DEFAULT_STACK_SIZE);
 	}
 
 	/**
@@ -104,20 +106,20 @@ public class Coroutine implements Runnable, Serializable {
 	 * can be used in several Coroutines at the same time - but then the normal
 	 * multi threading rules apply to the member state.
 	 *
-	 * @param proto     the CoroutineProto for the Coroutine.
+	 * @param runnable  the CoroutineProto for the Coroutine.
 	 * @param stackSize the initial stack size for the data stack
-	 * @throws NullPointerException     when proto is null
+	 * @throws NullPointerException     when runnable is null
 	 * @throws IllegalArgumentException when stackSize is &lt;= 0
 	 */
-	public Coroutine(final CoroutineProto proto, final int stackSize) {
-		this.proto = proto;
+	public Coroutine(final SuspendableRunnable runnable, final int stackSize) {
+		this.runnable = runnable;
 		this.stack = new Stack(this, stackSize);
 		this.state = State.NEW;
 
-		if (proto == null) {
-			throw new NullPointerException("proto");
+		if (runnable == null) {
+			throw new NullPointerException("runnable");
 		}
-		assert isInstrumented(proto) : "Not instrumented";
+		assert isInstrumented(runnable) : "Not instrumented";
 	}
 
 	/**
@@ -131,15 +133,6 @@ public class Coroutine implements Runnable, Serializable {
 			return s.co;
 		}
 		return null;
-	}
-
-	/**
-	 * Returns the CoroutineProto that is used for this Coroutine
-	 *
-	 * @return The CoroutineProto that is used for this Coroutine
-	 */
-	public CoroutineProto getProto() {
-		return proto;
 	}
 
 	/**
@@ -170,7 +163,7 @@ public class Coroutine implements Runnable, Serializable {
 			state = State.RUNNING;
 			Stack.setStack(stack);
 			try {
-				proto.run();
+				runnable.run();
 			} catch (final SuspendExecution ex) {
 				assert ex == SuspendExecution.instance;
 				result = State.SUSPENDED;
@@ -189,7 +182,7 @@ public class Coroutine implements Runnable, Serializable {
 		out.defaultWriteObject();
 	}
 
-	private boolean isInstrumented(final CoroutineProto proto) {
+	private boolean isInstrumented(final SuspendableRunnable proto) {
 		try {
 			final Class clz = Class.forName("com.zarbosoft.coroutinescore.instrument.AlreadyInstrumented");
 			return proto.getClass().isAnnotationPresent(clz);

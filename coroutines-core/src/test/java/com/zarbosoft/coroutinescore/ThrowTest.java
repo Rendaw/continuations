@@ -40,7 +40,7 @@ import static org.junit.Assert.assertEquals;
  *
  * @author Matthias Mann
  */
-public class ThrowTest implements CoroutineProto {
+public class ThrowTest implements SuspendableRunnable {
 
 	private final ArrayList<String> results = new ArrayList<>();
 

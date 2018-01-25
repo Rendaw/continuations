@@ -4,6 +4,7 @@
  */
 package com.zarbosoft.coroutinescore;
 
+import com.zarbosoft.coroutinescore.instrument.Stack;
 import org.junit.Test;
 
 import java.lang.reflect.Field;
@@ -14,7 +15,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * @author Matthias Mann
  */
-public class InitialSizeTest implements CoroutineProto {
+public class InitialSizeTest implements SuspendableRunnable {
 
 	@Test
 	public void test1() {

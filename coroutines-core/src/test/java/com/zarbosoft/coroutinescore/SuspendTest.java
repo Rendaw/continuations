@@ -35,7 +35,7 @@ import org.junit.Test;
  *
  * @author Matthias Mann
  */
-public class SuspendTest implements CoroutineProto {
+public class SuspendTest implements SuspendableRunnable {
 
 	@Test
 	public void testSuspend() {

@@ -45,7 +45,10 @@ package com.zarbosoft.coroutinescore;
  */
 public final class SuspendExecution extends Throwable {
 
-	static final SuspendExecution instance = new SuspendExecution();
+	/**
+	 * Do not throw this. Call Coroutine.yield() to suspend.
+	 */
+	public static final SuspendExecution instance = new SuspendExecution();
 
 	private SuspendExecution() {
 	}

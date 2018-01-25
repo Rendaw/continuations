@@ -48,7 +48,7 @@ public class SuspendConstructorArgumentTest {
 			Target(final int arg) {
 			}
 		}
-		class TestCoroutineProto implements CoroutineProto {
+		class TestCoroutineProto implements SuspendableRunnable {
 			int value = 0;
 
 			@Override
@@ -72,7 +72,7 @@ public class SuspendConstructorArgumentTest {
 			Target(final int arg, final int arg2) {
 			}
 		}
-		class TestCoroutineProto implements CoroutineProto {
+		class TestCoroutineProto implements SuspendableRunnable {
 			int value = 0;
 
 			@Override

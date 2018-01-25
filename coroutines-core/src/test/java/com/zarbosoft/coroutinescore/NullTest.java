@@ -7,7 +7,7 @@ import static org.junit.Assert.assertEquals;
 /**
  * @author Matthias Mann
  */
-public class NullTest implements CoroutineProto {
+public class NullTest implements SuspendableRunnable {
 
 	Object result = "b";
 

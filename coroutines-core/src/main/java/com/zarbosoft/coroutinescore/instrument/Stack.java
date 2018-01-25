@@ -26,9 +26,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.zarbosoft.coroutinescore;
+package com.zarbosoft.coroutinescore.instrument;
 
-import com.zarbosoft.coroutinescore.instrument.InstrumentMethod;
+import com.zarbosoft.coroutinescore.Coroutine;
+import com.zarbosoft.coroutinescore.SuspendExecution;
 
 import java.io.Serializable;
 
@@ -51,7 +52,7 @@ public final class Stack implements Serializable {
 	 */
 	public static SuspendExecution exception_instance_not_for_user_code = SuspendExecution.instance;
 
-	final Coroutine co;
+	public final Coroutine co;
 
 	private int methodTOS = -1;
 	private int[] method;
@@ -61,7 +62,7 @@ public final class Stack implements Serializable {
 
 	transient int curMethodSP;
 
-	Stack(final Coroutine co, final int stackSize) {
+	public Stack(final Coroutine co, final int stackSize) {
 		if (stackSize <= 0) {
 			throw new IllegalArgumentException("stackSize");
 		}
@@ -75,7 +76,7 @@ public final class Stack implements Serializable {
 		return tls.get();
 	}
 
-	static void setStack(final Stack s) {
+	public static void setStack(final Stack s) {
 		tls.set(s);
 	}
 
@@ -177,7 +178,7 @@ public final class Stack implements Serializable {
 	/**
 	 * called when resuming a stack
 	 */
-	final void resumeStack() {
+	public final void resumeStack() {
 		methodTOS = -1;
 	}
     

@@ -19,7 +19,7 @@ public class InheritTest {
 	@Test
 	public void testInherit() {
 		final C dut = new C();
-		final Coroutine c = new Coroutine(new CoroutineProto() {
+		final Coroutine c = new Coroutine(new SuspendableRunnable() {
 			public void run() throws SuspendExecution {
 				dut.myMethod();
 			}

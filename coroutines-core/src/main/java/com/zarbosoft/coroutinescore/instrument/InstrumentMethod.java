@@ -28,7 +28,6 @@
  */
 package com.zarbosoft.coroutinescore.instrument;
 
-import com.zarbosoft.coroutinescore.Stack;
 import com.zarbosoft.coroutinescore.SuspendExecution;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;

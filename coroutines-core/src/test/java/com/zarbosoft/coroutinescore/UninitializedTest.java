@@ -12,7 +12,7 @@ import static org.junit.Assert.assertEquals;
 /**
  * @author Matthias Mann
  */
-public class UninitializedTest implements CoroutineProto {
+public class UninitializedTest implements SuspendableRunnable {
 
 	Object result = "b";
 

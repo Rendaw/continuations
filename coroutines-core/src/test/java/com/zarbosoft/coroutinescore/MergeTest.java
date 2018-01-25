@@ -12,7 +12,7 @@ import java.io.IOException;
 /**
  * @author mam
  */
-public class MergeTest implements CoroutineProto {
+public class MergeTest implements SuspendableRunnable {
 
 	public static void throwsIO() throws IOException {
 	}

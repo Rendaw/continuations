@@ -5,7 +5,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * @author mam
  */
-public class Merge2Test implements CoroutineProto {
+public class Merge2Test implements SuspendableRunnable {
 
 	public interface Interface {
 		public void method();

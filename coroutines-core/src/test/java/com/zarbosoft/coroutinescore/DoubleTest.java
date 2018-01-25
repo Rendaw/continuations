@@ -12,7 +12,7 @@ import static org.junit.Assert.assertEquals;
 /**
  * @author Matthias Mann
  */
-public class DoubleTest implements CoroutineProto {
+public class DoubleTest implements SuspendableRunnable {
 
 	double result;
 

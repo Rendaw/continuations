@@ -10,9 +10,9 @@ public class NestingTest {
 	@Test
 	public void testSuspend() throws NoSuchMethodException {
 		final int[] value = new int[] {0};
-		final Coroutine co = new Coroutine(new CoroutineProto() {
+		final Coroutine co = new Coroutine(new SuspendableRunnable() {
 			public final void run() throws SuspendExecution {
-				final Coroutine co2 = new Coroutine(new CoroutineProto() {
+				final Coroutine co2 = new Coroutine(new SuspendableRunnable() {
 					public final void run() throws SuspendExecution {
 						value[0] = 2;
 						Coroutine.yield();

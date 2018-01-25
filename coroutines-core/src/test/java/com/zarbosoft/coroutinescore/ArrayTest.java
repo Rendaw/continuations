@@ -10,7 +10,7 @@ import static org.junit.Assert.assertEquals;
 /**
  * @author Matthias Mann
  */
-public class ArrayTest implements CoroutineProto {
+public class ArrayTest implements SuspendableRunnable {
 
 	private static final PatchLevel l1 = new PatchLevel();
 	private static final PatchLevel[] l2 = new PatchLevel[] {l1};

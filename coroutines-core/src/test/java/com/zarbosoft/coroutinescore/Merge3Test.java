@@ -3,7 +3,7 @@ package com.zarbosoft.coroutinescore;
 /**
  * @author Matthias Mann
  */
-public class Merge3Test implements CoroutineProto {
+public class Merge3Test implements SuspendableRunnable {
 
 	public boolean a;
 	public boolean b;

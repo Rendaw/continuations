@@ -16,7 +16,7 @@ public class ReflectTest {
 
 	@Test
 	public void testSuspend() throws NoSuchMethodException {
-		final Coroutine co = new Coroutine(new CoroutineProto() {
+		final Coroutine co = new Coroutine(new SuspendableRunnable() {
 			Method method = ReflectTest.class.getMethod("method");
 
 			public final void run() throws SuspendExecution {

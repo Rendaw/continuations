@@ -15,7 +15,7 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertThat;
 
 public class SerializeTest {
-	static class TestCoroutineProto implements CoroutineProto, Serializable {
+	static class TestCoroutineProto implements SuspendableRunnable, Serializable {
 		private static final long serialVersionUID = 351278561540L;
 		int value = 0;
 
@@ -50,10 +50,10 @@ public class SerializeTest {
 		}
 
 		assertNotSame(coroutine, coroutine2);
-		assertNotSame(coroutine.getProto(), coroutine2.getProto());
+		assertNotSame(coroutine.runnable, coroutine2.runnable);
 
 		coroutine2.run();
-		assertThat(((TestCoroutineProto) coroutine2.getProto()).value, equalTo(2));
+		assertThat(((TestCoroutineProto) coroutine2.runnable).value, equalTo(2));
 		assertThat(coroutine2.getState(), equalTo(FINISHED));
 	}
 }

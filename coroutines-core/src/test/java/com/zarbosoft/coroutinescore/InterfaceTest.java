@@ -7,11 +7,6 @@ import org.junit.Test;
  */
 public class InterfaceTest {
 
-	public class C2 implements SomeInterface {
-		public void doStuff() throws SuspendExecution {
-		}
-	}
-
 	public class C implements SomeInterface {
 		public void doStuff() throws SuspendExecution {
 /*			float time = 0f;
@@ -35,7 +30,7 @@ public class InterfaceTest {
 	@Test
 	public void testSuspend() {
 		//		final I i = new C();
-		final Coroutine co = new Coroutine(new CoroutineProto() {
+		final Coroutine co = new Coroutine(new SuspendableRunnable() {
 			public final void run() throws SuspendExecution {
 				// next line causes an error because of incomplete merge in TypeInterpreter
 				//SomeInterface i = System.currentTimeMillis() > 0 ? new C() : new C2();
