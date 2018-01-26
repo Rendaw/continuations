@@ -36,7 +36,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 /**
- * <p>A Coroutine is used to run a CoroutineProto.</p>
+ * <p>A Coroutine is used to run a SuspendableRunnable.</p>
  * <p>It also provides a function to suspend a running Coroutine.</p>
  * <p>A Coroutine can be serialized if it's not running and all involved
  * classes and data types are also {@link Serializable}.</p>
@@ -48,7 +48,7 @@ public class Coroutine implements Runnable, Serializable {
 	/**
 	 * Default stack size for the data stack.
 	 *
-	 * @see #Coroutine(CoroutineProto, int)
+	 * @see #Coroutine(SuspendableRunnable, int)
 	 */
 	public static final int DEFAULT_STACK_SIZE = 16;
 
@@ -91,22 +91,22 @@ public class Coroutine implements Runnable, Serializable {
 	}
 
 	/**
-	 * Creates a new Coroutine from the given CoroutineProto. A CoroutineProto
+	 * Creates a new Coroutine from the given SuspendableRunnable. A SuspendableRunnable
 	 * can be used in several Coroutines at the same time - but then the normal
 	 * multi threading rules apply to the member state.
 	 *
-	 * @param runnable the CoroutineProto for the Coroutine.
+	 * @param runnable the SuspendableRunnable for the Coroutine.
 	 */
 	public Coroutine(final SuspendableRunnable runnable) {
 		this(runnable, DEFAULT_STACK_SIZE);
 	}
 
 	/**
-	 * Creates a new Coroutine from the given CoroutineProto. A CoroutineProto
+	 * Creates a new Coroutine from the given SuspendableRunnable. A SuspendableRunnable
 	 * can be used in several Coroutines at the same time - but then the normal
 	 * multi threading rules apply to the member state.
 	 *
-	 * @param runnable  the CoroutineProto for the Coroutine.
+	 * @param runnable  the SuspendableRunnable for the Coroutine.
 	 * @param stackSize the initial stack size for the data stack
 	 * @throws NullPointerException     when runnable is null
 	 * @throws IllegalArgumentException when stackSize is &lt;= 0

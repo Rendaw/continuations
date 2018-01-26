@@ -10,6 +10,18 @@ Source mapping isn't affected by coroutine instrumentation so debugging and trac
 
 Coroutines are serializable.
 
+# Maven
+
+I recommend using `com.zarbosoft.coroutines` for a slightly more usable solution, but if you want to use this directly:
+
+```
+<dependency>
+    <groupId>com.zarbosoft</groupId>
+    <artifactId>coroutinescore</artifactId>
+    <version>0.0.3</version>
+</dependency>
+```
+
 # Example
 
 ```
@@ -147,7 +159,7 @@ Add the following to your `pom.xml`:
         <dependency>
             <groupId>com.zarbosoft</groupId>
             <artifactId>coroutinescore</artifactId>
-            <version>1.0.0</version>
+            <version>0.0.3</version>
         </dependency>
     </dependencies>
     <executions>
