@@ -2,9 +2,7 @@
 
 Coroutines are methods that can be stopped at any place within and then resumed from that point.  They are often used as lightweight threads, switching between activities in a single thread when an activity needs to wait for something like disk reads or network data to arrive.
 
-This uses org.ow2.asm 5.2 for instrumentation which currently supports up to Java 8 bytecode.  Java 9 class files, even when generated with a target JVM of 1.8, cannot be opened and instrumentation will fail.
-
-Also note that currently calls via method references (like `MyClass::method`) and lambdas may cause issues.
+Now supports Java 9!
 
 Source mapping isn't affected by coroutine instrumentation so debugging and trace line numbers should operate as normal.
 
@@ -18,7 +16,7 @@ I recommend using `com.zarbosoft.coroutines` for a slightly more usable solution
 <dependency>
     <groupId>com.zarbosoft</groupId>
     <artifactId>coroutinescore</artifactId>
-    <version>0.0.3</version>
+    <version>0.0.4</version>
 </dependency>
 ```
 
@@ -159,7 +157,7 @@ Add the following to your `pom.xml`:
         <dependency>
             <groupId>com.zarbosoft</groupId>
             <artifactId>coroutinescore</artifactId>
-            <version>0.0.3</version>
+            <version>0.0.4</version>
         </dependency>
     </dependencies>
     <executions>
