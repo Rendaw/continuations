@@ -87,7 +87,7 @@ public class Coroutine implements Runnable, Serializable {
 	 * @throws java.lang.IllegalStateException If not called from a Coroutine
 	 */
 	public static void yield() throws SuspendExecution, IllegalStateException {
-		throw new Error("Calling function not instrumented");
+		throw new Error("Calling function not instrumented or yield was called with the wrong owner class.");
 	}
 
 	/**
