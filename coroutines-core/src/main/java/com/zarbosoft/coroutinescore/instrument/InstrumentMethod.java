@@ -127,7 +127,7 @@ public class InstrumentMethod {
 									min.desc
 							);
 						}
-						final FrameInfo fi = addCodeBlock(f, i);
+						final FrameInfo fi = allocateNextCodeBlock(f, i);
 						splitTryCatch(fi);
 					} else {
 						final int blockingId = isBlockingCall(min);
@@ -157,7 +157,7 @@ public class InstrumentMethod {
 				}
 			}
 		}
-		addCodeBlock(null, numIns);
+		allocateNextCodeBlock(null, numIns);
 
 		return numCodeBlocks > 1;
 	}
@@ -230,7 +230,7 @@ public class InstrumentMethod {
 		for (int i = 1; i < numCodeBlocks; i++) {
 			final FrameInfo fi = codeBlocks[i];
 
-			final MethodInsnNode min = (MethodInsnNode) (mn.instructions.get(fi.endInstruction));
+			final MethodInsnNode min = (MethodInsnNode) (mn.instructions.get(fi.index));
 			if (InstrumentClass.COROUTINE_NAME.equals(min.owner) && "yield".equals(min.name)) {
 				// special case - call to yield() - resume AFTER the call
 				if (min.getOpcode() != Opcodes.INVOKESTATIC) {
@@ -245,13 +245,13 @@ public class InstrumentMethod {
 				mv.visitInsn(Opcodes.ATHROW);
 				min.accept(mv); // only the call
 				mv.visitLabel(lMethodCalls[i - 1]);
-				emitRestoreState(mv, i, fi);
+				emitRestoreState(mv, fi);
 				dumpCodeBlock(mv, i, 1);    // skip the call
 			} else {
 				// normal case - call to a suspendable method - resume before the call
 				emitStoreState(mv, i, fi);
 				mv.visitLabel(lMethodCalls[i - 1]);
-				emitRestoreState(mv, i, fi);
+				emitRestoreState(mv, fi);
 				dumpCodeBlock(mv, i, 0);
 			}
 		}
@@ -273,7 +273,7 @@ public class InstrumentMethod {
 		mv.visitEnd();
 	}
 
-	private FrameInfo addCodeBlock(final Frame f, final int end) {
+	private FrameInfo allocateNextCodeBlock(final Frame f, final int end) {
 		if (++numCodeBlocks == codeBlocks.length) {
 			final FrameInfo[] newArray = new FrameInfo[numCodeBlocks * 2];
 			System.arraycopy(codeBlocks, 0, newArray, 0, codeBlocks.length);
@@ -284,21 +284,17 @@ public class InstrumentMethod {
 		return fi;
 	}
 
-	private int getLabelIdx(final LabelNode l) {
-		int idx;
+	/**
+	 * Find the next executable instruction after the label
+	 *
+	 * @param l label node to stat at
+	 * @return
+	 */
+	private int getLabelNextExecutableInst(final LabelNode l) {
 		if (l instanceof BlockLabelNode) {
-			idx = ((BlockLabelNode) l).idx;
+			return ((BlockLabelNode) l).idx;
 		} else {
-			idx = mn.instructions.indexOf(l);
-		}
-
-		// search for the "real" instruction
-		for (; ; ) {
-			final int type = mn.instructions.get(idx).getType();
-			if (type != AbstractInsnNode.LABEL && type != AbstractInsnNode.LINE) {
-				return idx;
-			}
-			idx++;
+			return mn.instructions.indexOf(l);
 		}
 	}
 
@@ -306,32 +302,32 @@ public class InstrumentMethod {
 		for (int i = 0; i < mn.tryCatchBlocks.size(); i++) {
 			final TryCatchBlockNode tcb = (TryCatchBlockNode) mn.tryCatchBlocks.get(i);
 
-			final int start = getLabelIdx(tcb.start);
-			final int end = getLabelIdx(tcb.end);
+			final int blockFirst = getLabelNextExecutableInst(tcb.start);
+			final int blockLast = getLabelNextExecutableInst(tcb.end) - 1;
+			if (fi.index < blockFirst || fi.index > blockLast)
+				continue;
 
-			if (start <= fi.endInstruction && end >= fi.endInstruction) {
-				//System.out.println("i="+i+" start="+start+" end="+end+" split="+splitIdx+
-				//        " start="+mn.instructions.get(start)+" end="+mn.instructions.get(end));
-
-				// need to split try/catch around the suspendable call
-				if (start == fi.endInstruction) {
-					tcb.start = fi.createAfterLabel();
-				} else {
-					if (end > fi.endInstruction) {
-						final TryCatchBlockNode tcb2 =
-								new TryCatchBlockNode(fi.createAfterLabel(), tcb.end, tcb.handler, tcb.type);
-						mn.tryCatchBlocks.add(i + 1, tcb2);
-					}
-
-					tcb.end = fi.createBeforeLabel();
+			if (blockFirst == fi.index) {
+				// Instruction is first in block - just adjust it after
+				tcb.start = fi.createLabelAfter();
+			} else {
+				if (blockLast > fi.index) {
+					// Instruction is in the middle
+					// Add a new exception block after the instruction
+					final TryCatchBlockNode tcb2 =
+							new TryCatchBlockNode(fi.createLabelAfter(), tcb.end, tcb.handler, tcb.type);
+					mn.tryCatchBlocks.add(i + 1, tcb2);
 				}
+
+				// Adjust the existing block to end before the instruction
+				tcb.end = fi.createLabelBefore();
 			}
 		}
 	}
 
 	private void dumpCodeBlock(final MethodVisitor mv, final int idx, final int skip) {
-		final int start = codeBlocks[idx].endInstruction;
-		final int end = codeBlocks[idx + 1].endInstruction;
+		final int start = codeBlocks[idx].index;
+		final int end = codeBlocks[idx + 1].index;
 
 		for (int i = start + skip; i < end; i++) {
 			final AbstractInsnNode ins = mn.instructions.get(i);
@@ -448,7 +444,7 @@ public class InstrumentMethod {
 	}
 
 	private void emitStoreState(final MethodVisitor mv, final int idx, final FrameInfo fi) {
-		final Frame f = frames[fi.endInstruction];
+		final Frame f = frames[fi.index];
 
 		if (fi.lBefore != null) {
 			fi.lBefore.accept(mv);
@@ -484,8 +480,8 @@ public class InstrumentMethod {
 		}
 	}
 
-	private void emitRestoreState(final MethodVisitor mv, final int idx, final FrameInfo fi) {
-		final Frame f = frames[fi.endInstruction];
+	private void emitRestoreState(final MethodVisitor mv, final FrameInfo fi) {
+		final Frame f = frames[fi.index];
 
 		for (int i = firstLocal; i < f.getLocals(); i++) {
 			final BasicValue v = (BasicValue) f.getLocal(i);
@@ -629,7 +625,7 @@ public class InstrumentMethod {
 	static class FrameInfo {
 		static final FrameInfo FIRST = new FrameInfo(null, 0, 0, null, null);
 
-		final int endInstruction;
+		final int index;
 		final int numSlots;
 		final int numObjSlots;
 		final int[] localSlotIndices;
@@ -639,13 +635,9 @@ public class InstrumentMethod {
 		BlockLabelNode lAfter;
 
 		FrameInfo(
-				final Frame f,
-				final int firstLocal,
-				final int endInstruction,
-				final InsnList insnList,
-				final MethodDatabase db
+				final Frame f, final int firstLocal, final int index, final InsnList insnList, final MethodDatabase db
 		) {
-			this.endInstruction = endInstruction;
+			this.index = index;
 
 			int idxObj = 0;
 			int idxPrim = 0;
@@ -661,7 +653,7 @@ public class InstrumentMethod {
 									LogLevel.DEBUG,
 									"Omit value from stack idx %d at instruction %d with type %s generated by %s",
 									i,
-									endInstruction,
+									index,
 									v,
 									newValue.formatInsn()
 							);
@@ -712,16 +704,16 @@ public class InstrumentMethod {
 			numObjSlots = idxObj;
 		}
 
-		public LabelNode createBeforeLabel() {
+		public LabelNode createLabelBefore() {
 			if (lBefore == null) {
-				lBefore = new BlockLabelNode(endInstruction);
+				lBefore = new BlockLabelNode(index);
 			}
 			return lBefore;
 		}
 
-		public LabelNode createAfterLabel() {
+		public LabelNode createLabelAfter() {
 			if (lAfter == null) {
-				lAfter = new BlockLabelNode(endInstruction);
+				lAfter = new BlockLabelNode(index);
 			}
 			return lAfter;
 		}

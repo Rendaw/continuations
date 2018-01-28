@@ -108,8 +108,6 @@ public class Coroutine implements Runnable, Serializable {
 	 *
 	 * @param runnable  the SuspendableRunnable for the Coroutine.
 	 * @param stackSize the initial stack size for the data stack
-	 * @throws NullPointerException     when runnable is null
-	 * @throws IllegalArgumentException when stackSize is &lt;= 0
 	 */
 	public Coroutine(final SuspendableRunnable runnable, final int stackSize) {
 		this.runnable = runnable;
@@ -119,7 +117,6 @@ public class Coroutine implements Runnable, Serializable {
 		if (runnable == null) {
 			throw new NullPointerException("runnable");
 		}
-		assert isInstrumented(runnable) : "Not instrumented";
 	}
 
 	/**
@@ -180,17 +177,6 @@ public class Coroutine implements Runnable, Serializable {
 			throw new IllegalStateException("trying to serialize a running coroutine");
 		}
 		out.defaultWriteObject();
-	}
-
-	private boolean isInstrumented(final SuspendableRunnable proto) {
-		try {
-			final Class clz = Class.forName("com.zarbosoft.coroutinescore.instrument.AlreadyInstrumented");
-			return proto.getClass().isAnnotationPresent(clz);
-		} catch (final ClassNotFoundException ex) {
-			return true;   // can't check
-		} catch (final Throwable ex) {
-			return true;    // it's just a check - make sure we don't fail if something goes wrong
-		}
 	}
 
 	/**
