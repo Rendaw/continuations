@@ -1,6 +1,3 @@
-# IDEA-related
-/.idea
-/*.iml
-
-# The output directory
-/build
+.idea
+*.iml
+*.log
