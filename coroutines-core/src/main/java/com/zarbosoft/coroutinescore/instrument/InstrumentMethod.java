@@ -36,7 +36,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 import org.objectweb.asm.tree.analysis.*;
 
-import java.util.List;
+import java.util.*;
 
 /**
  * Instrument a method to allow suspension
@@ -50,12 +50,11 @@ public class InstrumentMethod {
 	private final MethodDatabase db;
 	private final String className;
 	private final MethodNode mn;
-	private final Frame[] frames;
+	Map<AbstractInsnNode, Frame> invokeSpecialFrames = new HashMap<>();
 	private final int lvarStack;
 	private final int firstLocal;
 
-	private FrameInfo[] codeBlocks = new FrameInfo[32];
-	private int numCodeBlocks;
+	private final List<Suspension> suspensions = new ArrayList<>();
 	private int additionalLocals;
 
 	private boolean warnedAboutMonitors;
@@ -71,95 +70,236 @@ public class InstrumentMethod {
 
 	public InstrumentMethod(
 			final MethodDatabase db, final String className, final MethodNode mn
-	) throws AnalyzerException {
+	) {
 		this.db = db;
 		this.className = className;
 		this.mn = mn;
 
-		try {
-			final Analyzer a = new TypeAnalyzer(db);
-			this.frames = a.analyze(className, mn);
-			this.lvarStack = mn.maxLocals;
-			this.firstLocal = ((mn.access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC) ? 0 : 1;
-		} catch (final UnsupportedOperationException ex) {
-			throw new AnalyzerException(null, ex.getMessage(), ex);
-		}
+		this.lvarStack = mn.maxLocals;
+		this.firstLocal = ((mn.access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC) ? 0 : 1;
 	}
 
-	public boolean collectCodeBlocks() {
-		final int numIns = mn.instructions.size();
+	/**
+	 * Meta instructions don't generate bytecode
+	 *
+	 * @param inst
+	 * @return
+	 */
+	private static boolean isMetaInst(final AbstractInsnNode inst) {
+		return inst instanceof LabelNode || inst instanceof LineNumberNode || inst instanceof FrameNode;
+	}
 
-		codeBlocks[0] = FrameInfo.FIRST;
-		for (int i = 0; i < numIns; i++) {
+	public boolean collectCodeBlocks() throws AnalyzerException {
+		final Frame[] frames;
+		{
+			final Analyzer a = new TypeAnalyzer(db);
+			try {
+				frames = a.analyze(className, mn);
+			} catch (final UnsupportedOperationException ex) {
+				throw new AnalyzerException(null, ex.getMessage(), ex);
+			}
+		}
+
+		// Check instructions, find suspending nodes
+		for (int i = 0; i < mn.instructions.size(); ++i) {
+			System.out.format("all %s\n", mn.instructions.get(i));
 			final Frame f = frames[i];
-			if (f != null) { // reachable ?
-				final AbstractInsnNode in = mn.instructions.get(i);
-				if (in.getType() == AbstractInsnNode.METHOD_INSN) {
-					final MethodInsnNode min = (MethodInsnNode) in;
-					final int opcode = min.getOpcode();
-					final boolean isReflectInvoke =
-							"java/lang/reflect/Method".equals(min.owner) && "invoke".equals(min.name);
-					if (isReflectInvoke || db.isMethodSuspendable(min.owner,
-							min.name,
-							min.desc,
-							opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKESTATIC
-					)) {
-						if (isReflectInvoke) {
-							db.log(
-									LogLevel.DEBUG,
-									"Replacing reflect invoke method at instruction %d with wrapper; assumed suspendable",
-									i
-							);
-							// The wrapper has the same stack input as Method.invoke so all that needs to be done
-							// is replace the instruction with an invokestatic
-							mn.instructions.set(in, new MethodInsnNode(Opcodes.INVOKESTATIC,
-									"com/zarbosoft/coroutinescore/Coroutine",
-									"reflectInvoke",
-									"(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;",
-									false
-							));
-						} else {
-							db.log(LogLevel.DEBUG,
-									"Method call at instruction %d to %s#%s%s is suspendable",
-									i,
-									min.owner,
-									min.name,
-									min.desc
-							);
-						}
-						final FrameInfo fi = allocateNextCodeBlock(f, i);
-						splitTryCatch(fi);
-					} else {
-						final int blockingId = isBlockingCall(min);
-						if (blockingId >= 0) {
-							final int mask = 1 << blockingId;
-							if (!db.isAllowBlocking()) {
-								throw new UnableToInstrumentException("blocking call to " +
-										min.owner +
+			if (f == null)
+				continue; // reachable ?
+
+			MethodInsnNode node;
+			{
+				final AbstractInsnNode node1 = mn.instructions.get(i);
+				if (node1.getType() != AbstractInsnNode.METHOD_INSN)
+					continue;
+				node = (MethodInsnNode) node1;
+			}
+
+			// Find invoke special to associate frame
+			if (node.getOpcode() == Opcodes.INVOKESPECIAL && "<init>".equals(((MethodInsnNode) node).name)) {
+				invokeSpecialFrames.put(node, f);
+				continue;
+			}
+
+			// Find suspending node
+			final int opcode = node.getOpcode();
+			final boolean isReflectInvoke = "java/lang/reflect/Method".equals(node.owner) && "invoke".equals(node.name);
+			if (isReflectInvoke || db.isMethodSuspendable(node.owner,
+					node.name,
+					node.desc,
+					opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKESTATIC
+			)) {
+				if (!"com/zarbosoft/coroutinescore/Coroutine".equals(className) &&
+						!"reflectInvoke".equals(mn.name) &&
+						isReflectInvoke) {
+					db.log(
+							LogLevel.DEBUG,
+							"Replacing reflect invoke method at instruction %d with wrapper; assumed suspendable",
+							i
+					);
+					// The wrapper has the same stack input as Method.invoke so all that needs to be done
+					// is replace the instruction with an invokestatic
+					final AbstractInsnNode oldNode = node;
+					node = new MethodInsnNode(Opcodes.INVOKESTATIC,
+							"com/zarbosoft/coroutinescore/Coroutine",
+							"reflectInvoke",
+							"(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;",
+							false
+					);
+					mn.instructions.set(oldNode, node);
+				} else {
+					db.log(LogLevel.DEBUG,
+							"Method call at instruction %d to %s#%s%s is suspendable",
+							i,
+							node.owner,
+							node.name,
+							node.desc
+					);
+				}
+				suspensions.add(new Suspension(f, firstLocal, node, mn.instructions, db));
+				continue;
+			}
+
+			// Warn about blocking calls
+			{
+				final int blockingId = isBlockingCall(node);
+				if (blockingId >= 0) {
+					final int mask = 1 << blockingId;
+					if (!db.isAllowBlocking()) {
+						throw new UnableToInstrumentException("blocking call to " +
+								node.owner +
+								"#" +
+								node.name +
+								node.desc, className, mn.name, mn.desc);
+					} else if ((warnedAboutBlocking & mask) == 0) {
+						warnedAboutBlocking |= mask;
+						db.log(LogLevel.WARNING,
+								"Method %s#%s%s contains potentially blocking call to " +
+										node.owner +
 										"#" +
-										min.name +
-										min.desc, className, mn.name, mn.desc);
-							} else if ((warnedAboutBlocking & mask) == 0) {
-								warnedAboutBlocking |= mask;
-								db.log(LogLevel.WARNING,
-										"Method %s#%s%s contains potentially blocking call to " +
-												min.owner +
-												"#" +
-												min.name +
-												min.desc,
-										className,
-										mn.name,
-										mn.desc
-								);
-							}
-						}
+										node.name +
+										node.desc,
+								className,
+								mn.name,
+								mn.desc
+						);
 					}
 				}
 			}
 		}
-		allocateNextCodeBlock(null, numIns);
+		if (suspensions.isEmpty())
+			return false;
 
-		return numCodeBlocks > 1;
+		// Split exception ranges around suspending nodes
+		// Modifies the instruction + try catch block node lists so done after initial scan
+		{
+			System.out.format("in %s suspends %s, exception ranges %s\n",
+					mn.name,
+					suspensions.size(),
+					mn.tryCatchBlocks.size()
+			);
+			final ListIterator<TryCatchBlockNode> rangeListPosition = mn.tryCatchBlocks.listIterator();
+			while (rangeListPosition.hasNext()) {
+				final TryCatchBlockNode range = rangeListPosition.next();
+				System.out.format("range %s %s\n", range.start, range.end);
+				final LabelNode originalEnd = range.end;
+				AbstractInsnNode at = range.start;
+
+				class AdjustRanges {
+					TryCatchBlockNode useBlock = range;
+					AbstractInsnNode start;
+					int nonMetaCount = 0;
+
+					public AdjustRanges(final AbstractInsnNode start) {
+						this.start = start;
+					}
+
+					public void finishRange(final AbstractInsnNode suspension) {
+						final LabelNode endLabel = new LabelNode();
+						mn.instructions.insertBefore(suspension, endLabel);
+						finishRange(endLabel);
+						start = suspension.getNext(); // skip suspension
+						nonMetaCount = 0;
+					}
+
+					public void finishRange(final LabelNode endLabel) {
+						if (useBlock == null) {
+							final LabelNode startLabel = new LabelNode();
+							mn.instructions.insertBefore(start, startLabel);
+							rangeListPosition.add(new TryCatchBlockNode(startLabel,
+									endLabel,
+									range.handler,
+									range.type
+							));
+						} else {
+							useBlock.end = endLabel;
+							useBlock = null;
+						}
+					}
+				}
+				final AdjustRanges adjustRanges = new AdjustRanges(at);
+
+				final Iterator<Suspension> suspendingPosition = suspensions.iterator();
+				while (at != originalEnd && suspendingPosition.hasNext()) {
+					final Suspension nextSuspension = suspendingPosition.next();
+
+					// Find the suspending node
+					for (; at != originalEnd; at = at.getNext()) {
+						if (at instanceof MethodInsnNode) {
+							System.out.format("I %s %s %s\n",
+									at,
+									((MethodInsnNode) at).owner,
+									((MethodInsnNode) at).name
+							);
+						} else
+							System.out.format("I %s\n", at);
+						if (isMetaInst(at))
+							continue;
+						if (at == nextSuspension.node)
+							break;
+						adjustRanges.nonMetaCount += 1;
+					}
+					if (at != nextSuspension.node)
+						break;
+
+					// Make try block encompass statements between suspensions
+					if (adjustRanges.nonMetaCount > 0) {
+						System.out.format("before range count: %s\n", adjustRanges.nonMetaCount);
+						adjustRanges.finishRange(at);
+					}
+				}
+
+				// Check to see if any non-meta instructions are in range after last suspend
+				if (at != originalEnd)
+					at = at.getNext(); // Skip last suspension
+				if (at instanceof MethodInsnNode) {
+					System.out.format("I2 %s %s %s\n", at, ((MethodInsnNode) at).owner, ((MethodInsnNode) at).name);
+				} else
+					System.out.format("I2 %s\n", at);
+				for (; at != originalEnd; at = at.getNext()) {
+					if (at instanceof MethodInsnNode) {
+						System.out.format("I3 %s %s %s\n", at, ((MethodInsnNode) at).owner, ((MethodInsnNode) at).name);
+					} else
+						System.out.format("I3 %s\n", at);
+					if (isMetaInst(at))
+						continue;
+					adjustRanges.nonMetaCount += 1;
+					//break;
+				}
+
+				if (adjustRanges.nonMetaCount > 0) {
+					System.out.format("final range count: %s\n", adjustRanges.nonMetaCount);
+					// Make try block encompass final range (node == range.end ~ exclusive)
+					adjustRanges.finishRange(originalEnd);
+				} else if (adjustRanges.useBlock != null) {
+					System.out.format("range was empty; deleting\n");
+					// Try block was empty before and after, remove
+					rangeListPosition.remove();
+				}
+			}
+		}
+
+		return true;
 	}
 
 	private static int isBlockingCall(final MethodInsnNode ins) {
@@ -179,13 +319,8 @@ public class InstrumentMethod {
 		final Label lMethodStart = new Label();
 		final Label lMethodEnd = new Label();
 		final Label lCatchSEE = new Label();
-		final Label lCatchAll = new Label();
-		final Label[] lMethodCalls = new Label[numCodeBlocks - 1];
 
-		for (int i = 1; i < numCodeBlocks; i++) {
-			lMethodCalls[i - 1] = new Label();
-		}
-
+		// Output setup code
 		mv.visitTryCatchBlock(lMethodStart, lMethodEnd, lCatchSEE, CheckInstrumentationVisitor.EXCEPTION_NAME);
 
 		for (final Object o : mn.tryCatchBlocks) {
@@ -215,6 +350,7 @@ public class InstrumentMethod {
 			}
 		}
 
+		final Label lCatchAll = new Label();
 		mv.visitTryCatchBlock(lMethodStart, lMethodEnd, lCatchAll, null);
 
 		mv.visitMethodInsn(Opcodes.INVOKESTATIC, STACK_NAME, "getStack", "()L" + STACK_NAME + ";");
@@ -222,42 +358,114 @@ public class InstrumentMethod {
 		mv.visitVarInsn(Opcodes.ASTORE, lvarStack);
 
 		mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "nextMethodEntry", "()I");
-		mv.visitTableSwitchInsn(1, numCodeBlocks - 1, lMethodStart, lMethodCalls);
+		final Label[] lMethodCalls = new Label[suspensions.size()];
+		for (int i = 0; i < suspensions.size(); ++i) {
+			lMethodCalls[i] = new Label();
+		}
+		mv.visitTableSwitchInsn(1,
+				suspensions.size(),
+				lMethodStart,
+				lMethodCalls
+		); // 0 is the default value, so skip it
 
 		mv.visitLabel(lMethodStart);
-		dumpCodeBlock(mv, 0, 0);
 
-		for (int i = 1; i < numCodeBlocks; i++) {
-			final FrameInfo fi = codeBlocks[i];
+		// Output body + suspend/resumes
+		class OutputNodesBetween {
+			public void go(final AbstractInsnNode start, final AbstractInsnNode end) {
+				for (AbstractInsnNode node = start; node != end; node = node.getNext()) {
+					switch (node.getOpcode()) {
+						case Opcodes.RETURN:
+						case Opcodes.ARETURN:
+						case Opcodes.IRETURN:
+						case Opcodes.LRETURN:
+						case Opcodes.FRETURN:
+						case Opcodes.DRETURN:
+							emitPopMethod(mv);
+							break;
 
-			final MethodInsnNode min = (MethodInsnNode) (mn.instructions.get(fi.index));
+						case Opcodes.MONITORENTER:
+						case Opcodes.MONITOREXIT:
+							if (!db.isAllowMonitors()) {
+								throw new UnableToInstrumentException("synchronisation", className, mn.name, mn.desc);
+							} else if (!warnedAboutMonitors) {
+								warnedAboutMonitors = true;
+								db.log(LogLevel.WARNING,
+										"Method %s#%s%s contains synchronisation",
+										className,
+										mn.name,
+										mn.desc
+								);
+							}
+							break;
+
+						case Opcodes.INVOKESPECIAL:
+							final MethodInsnNode min = (MethodInsnNode) node;
+							if ("<init>".equals(min.name)) {
+								final int argSize = TypeAnalyzer.getNumArguments(min.desc);
+								final Frame frame = invokeSpecialFrames.get(min);
+								final int stackIndex = frame.getStackSize() - argSize - 1;
+								final Value thisValue = frame.getStack(stackIndex);
+								if (stackIndex >= 1 &&
+										isNewValue(thisValue, true) &&
+										isNewValue(frame.getStack(stackIndex - 1), false)) {
+									final NewValue newValue = (NewValue) thisValue;
+									if (newValue.omitted) {
+										emitNewAndDup(mv, frame, stackIndex, min);
+									}
+								} else {
+									db.log(LogLevel.WARNING,
+											"Expected to find a NewValue on stack index %d: %s",
+											stackIndex,
+											frame
+									);
+								}
+							}
+							break;
+					}
+					node.accept(mv);
+				}
+			}
+		}
+		final OutputNodesBetween outputNodesBetween = new OutputNodesBetween();
+
+		AbstractInsnNode outputLast = mn.instructions.getFirst();
+		for (int i = 0; i < suspensions.size(); ++i) {
+			final Suspension suspension = suspensions.get(i);
+			outputNodesBetween.go(outputLast, suspension.node);
+			outputLast = suspension.node;
+
+			final MethodInsnNode min = (MethodInsnNode) suspension.node;
 			if (InstrumentClass.COROUTINE_NAME.equals(min.owner) && "yield".equals(min.name)) {
-				// special case - call to yield() - resume AFTER the call
+				// Direct call to Coroutine.yield
+				// Replace with custom instructions
 				if (min.getOpcode() != Opcodes.INVOKESTATIC) {
 					throw new UnableToInstrumentException("invalid call to yield()", className, mn.name, mn.desc);
 				}
-				emitStoreState(mv, i, fi);
+				emitStoreState(mv, i + 1, suspension);
 				mv.visitFieldInsn(Opcodes.GETSTATIC,
 						STACK_NAME,
 						"exception_instance_not_for_user_code",
 						CheckInstrumentationVisitor.EXCEPTION_DESC
 				);
 				mv.visitInsn(Opcodes.ATHROW);
-				min.accept(mv); // only the call
-				mv.visitLabel(lMethodCalls[i - 1]);
-				emitRestoreState(mv, fi);
-				dumpCodeBlock(mv, i, 1);    // skip the call
+				//min.accept(mv); // only the call
+				mv.visitLabel(lMethodCalls[i]);
+				emitRestoreState(mv, suspension);
+				outputLast = outputLast.getNext(); // Skip the suspended call itself
 			} else {
-				// normal case - call to a suspendable method - resume before the call
-				emitStoreState(mv, i, fi);
-				mv.visitLabel(lMethodCalls[i - 1]);
-				emitRestoreState(mv, fi);
-				dumpCodeBlock(mv, i, 0);
+				// Suspendable method
+				// Reenter the method upon resuming
+				emitStoreState(mv, i + 1, suspension);
+				mv.visitLabel(lMethodCalls[i]);
+				emitRestoreState(mv, suspension);
 			}
 		}
+		outputNodesBetween.go(outputLast, null);
 
 		mv.visitLabel(lMethodEnd);
 
+		// Output stack cleanup
 		mv.visitLabel(lCatchAll);
 		emitPopMethod(mv);
 		mv.visitLabel(lCatchSEE);
@@ -271,117 +479,6 @@ public class InstrumentMethod {
 
 		mv.visitMaxs(mn.maxStack + 3, mn.maxLocals + 1 + additionalLocals);
 		mv.visitEnd();
-	}
-
-	private FrameInfo allocateNextCodeBlock(final Frame f, final int end) {
-		if (++numCodeBlocks == codeBlocks.length) {
-			final FrameInfo[] newArray = new FrameInfo[numCodeBlocks * 2];
-			System.arraycopy(codeBlocks, 0, newArray, 0, codeBlocks.length);
-			codeBlocks = newArray;
-		}
-		final FrameInfo fi = new FrameInfo(f, firstLocal, end, mn.instructions, db);
-		codeBlocks[numCodeBlocks] = fi;
-		return fi;
-	}
-
-	/**
-	 * Find the next executable instruction after the label
-	 *
-	 * @param l label node to stat at
-	 * @return
-	 */
-	private int getLabelNextExecutableInst(final LabelNode l) {
-		if (l instanceof BlockLabelNode) {
-			return ((BlockLabelNode) l).idx;
-		} else {
-			return mn.instructions.indexOf(l);
-		}
-	}
-
-	private void splitTryCatch(final FrameInfo fi) {
-		for (int i = 0; i < mn.tryCatchBlocks.size(); i++) {
-			final TryCatchBlockNode tcb = (TryCatchBlockNode) mn.tryCatchBlocks.get(i);
-
-			final int blockFirst = getLabelNextExecutableInst(tcb.start);
-			final int blockLast = getLabelNextExecutableInst(tcb.end) - 1;
-			if (fi.index < blockFirst || fi.index > blockLast)
-				continue;
-
-			if (blockFirst == fi.index) {
-				// Instruction is first in block - just adjust it after
-				tcb.start = fi.createLabelAfter();
-			} else {
-				if (blockLast > fi.index) {
-					// Instruction is in the middle
-					// Add a new exception block after the instruction
-					final TryCatchBlockNode tcb2 =
-							new TryCatchBlockNode(fi.createLabelAfter(), tcb.end, tcb.handler, tcb.type);
-					mn.tryCatchBlocks.add(i + 1, tcb2);
-				}
-
-				// Adjust the existing block to end before the instruction
-				tcb.end = fi.createLabelBefore();
-			}
-		}
-	}
-
-	private void dumpCodeBlock(final MethodVisitor mv, final int idx, final int skip) {
-		final int start = codeBlocks[idx].index;
-		final int end = codeBlocks[idx + 1].index;
-
-		for (int i = start + skip; i < end; i++) {
-			final AbstractInsnNode ins = mn.instructions.get(i);
-			switch (ins.getOpcode()) {
-				case Opcodes.RETURN:
-				case Opcodes.ARETURN:
-				case Opcodes.IRETURN:
-				case Opcodes.LRETURN:
-				case Opcodes.FRETURN:
-				case Opcodes.DRETURN:
-					emitPopMethod(mv);
-					break;
-
-				case Opcodes.MONITORENTER:
-				case Opcodes.MONITOREXIT:
-					if (!db.isAllowMonitors()) {
-						throw new UnableToInstrumentException("synchronisation", className, mn.name, mn.desc);
-					} else if (!warnedAboutMonitors) {
-						warnedAboutMonitors = true;
-						db.log(LogLevel.WARNING,
-								"Method %s#%s%s contains synchronisation",
-								className,
-								mn.name,
-								mn.desc
-						);
-					}
-					break;
-
-				case Opcodes.INVOKESPECIAL:
-					final MethodInsnNode min = (MethodInsnNode) ins;
-					if ("<init>".equals(min.name)) {
-						final int argSize = TypeAnalyzer.getNumArguments(min.desc);
-						final Frame frame = frames[i];
-						final int stackIndex = frame.getStackSize() - argSize - 1;
-						final Value thisValue = frame.getStack(stackIndex);
-						if (stackIndex >= 1 &&
-								isNewValue(thisValue, true) &&
-								isNewValue(frame.getStack(stackIndex - 1), false)) {
-							final NewValue newValue = (NewValue) thisValue;
-							if (newValue.omitted) {
-								emitNewAndDup(mv, frame, stackIndex, min);
-							}
-						} else {
-							db.log(LogLevel.WARNING,
-									"Expected to find a NewValue on stack index %d: %s",
-									stackIndex,
-									frame
-							);
-						}
-					}
-					break;
-			}
-			ins.accept(mv);
-		}
 	}
 
 	private static void dumpParameterAnnotations(
@@ -443,24 +540,18 @@ public class InstrumentMethod {
 		mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "popMethod", "()V");
 	}
 
-	private void emitStoreState(final MethodVisitor mv, final int idx, final FrameInfo fi) {
-		final Frame f = frames[fi.index];
-
-		if (fi.lBefore != null) {
-			fi.lBefore.accept(mv);
-		}
-
+	private void emitStoreState(final MethodVisitor mv, final int jumpTableIndex, final Suspension suspension) {
 		mv.visitVarInsn(Opcodes.ALOAD, lvarStack);
-		emitConst(mv, idx);
-		emitConst(mv, fi.numSlots);
+		emitConst(mv, jumpTableIndex);
+		emitConst(mv, suspension.numSlots);
 		mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "pushMethodAndReserveSpace", "(II)V");
 
-		for (int i = f.getStackSize(); i-- > 0; ) {
-			final BasicValue v = (BasicValue) f.getStack(i);
+		for (int i = suspension.frame.getStackSize(); i-- > 0; ) {
+			final BasicValue v = (BasicValue) suspension.frame.getStack(i);
 			if (!isOmitted(v)) {
 				if (!isNullType(v)) {
-					final int slotIdx = fi.stackSlotIndices[i];
-					assert slotIdx >= 0 && slotIdx < fi.numSlots;
+					final int slotIdx = suspension.stackSlotIndices[i];
+					assert slotIdx >= 0 && slotIdx < suspension.numSlots;
 					emitStoreValue(mv, v, lvarStack, slotIdx);
 				} else {
 					db.log(LogLevel.DEBUG, "NULL stack entry: type=%s size=%d", v.getType(), v.getSize());
@@ -469,22 +560,20 @@ public class InstrumentMethod {
 			}
 		}
 
-		for (int i = firstLocal; i < f.getLocals(); i++) {
-			final BasicValue v = (BasicValue) f.getLocal(i);
+		for (int i = firstLocal; i < suspension.frame.getLocals(); i++) {
+			final BasicValue v = (BasicValue) suspension.frame.getLocal(i);
 			if (!isNullType(v)) {
 				mv.visitVarInsn(v.getType().getOpcode(Opcodes.ILOAD), i);
-				final int slotIdx = fi.localSlotIndices[i];
-				assert slotIdx >= 0 && slotIdx < fi.numSlots;
+				final int slotIdx = suspension.localSlotIndices[i];
+				assert slotIdx >= 0 && slotIdx < suspension.numSlots;
 				emitStoreValue(mv, v, lvarStack, slotIdx);
 			}
 		}
 	}
 
-	private void emitRestoreState(final MethodVisitor mv, final FrameInfo fi) {
-		final Frame f = frames[fi.index];
-
-		for (int i = firstLocal; i < f.getLocals(); i++) {
-			final BasicValue v = (BasicValue) f.getLocal(i);
+	private void emitRestoreState(final MethodVisitor mv, final Suspension fi) {
+		for (int i = firstLocal; i < fi.frame.getLocals(); i++) {
+			final BasicValue v = (BasicValue) fi.frame.getLocal(i);
 			if (!isNullType(v)) {
 				final int slotIdx = fi.localSlotIndices[i];
 				assert slotIdx >= 0 && slotIdx < fi.numSlots;
@@ -496,8 +585,8 @@ public class InstrumentMethod {
 			}
 		}
 
-		for (int i = 0; i < f.getStackSize(); i++) {
-			final BasicValue v = (BasicValue) f.getStack(i);
+		for (int i = 0; i < fi.frame.getStackSize(); i++) {
+			final BasicValue v = (BasicValue) fi.frame.getStack(i);
 			if (!isOmitted(v)) {
 				if (!isNullType(v)) {
 					final int slotIdx = fi.stackSlotIndices[i];
@@ -507,10 +596,6 @@ public class InstrumentMethod {
 					mv.visitInsn(Opcodes.ACONST_NULL);
 				}
 			}
-		}
-
-		if (fi.lAfter != null) {
-			fi.lAfter.accept(mv);
 		}
 	}
 
@@ -614,30 +699,23 @@ public class InstrumentMethod {
 		return false;
 	}
 
-	static class BlockLabelNode extends LabelNode {
-		final int idx;
-
-		BlockLabelNode(final int idx) {
-			this.idx = idx;
-		}
-	}
-
-	static class FrameInfo {
-		static final FrameInfo FIRST = new FrameInfo(null, 0, 0, null, null);
-
-		final int index;
+	static class Suspension {
+		final Frame frame;
+		final AbstractInsnNode node;
 		final int numSlots;
 		final int numObjSlots;
 		final int[] localSlotIndices;
 		final int[] stackSlotIndices;
 
-		BlockLabelNode lBefore;
-		BlockLabelNode lAfter;
-
-		FrameInfo(
-				final Frame f, final int firstLocal, final int index, final InsnList insnList, final MethodDatabase db
+		Suspension(
+				final Frame f,
+				final int firstLocal,
+				final AbstractInsnNode node,
+				final InsnList insnList,
+				final MethodDatabase db
 		) {
-			this.index = index;
+			this.frame = f;
+			this.node = node;
 
 			int idxObj = 0;
 			int idxPrim = 0;
@@ -653,7 +731,7 @@ public class InstrumentMethod {
 									LogLevel.DEBUG,
 									"Omit value from stack idx %d at instruction %d with type %s generated by %s",
 									i,
-									index,
+									insnList.indexOf(node),
 									v,
 									newValue.formatInsn()
 							);
@@ -702,20 +780,6 @@ public class InstrumentMethod {
 
 			numSlots = Math.max(idxPrim, idxObj);
 			numObjSlots = idxObj;
-		}
-
-		public LabelNode createLabelBefore() {
-			if (lBefore == null) {
-				lBefore = new BlockLabelNode(index);
-			}
-			return lBefore;
-		}
-
-		public LabelNode createLabelAfter() {
-			if (lAfter == null) {
-				lAfter = new BlockLabelNode(index);
-			}
-			return lAfter;
 		}
 	}
 

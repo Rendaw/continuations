@@ -45,6 +45,13 @@ import java.lang.reflect.Method;
  */
 public class Coroutine implements Runnable, Serializable {
 
+	public static class Error extends RuntimeException {
+
+		public Error(final String s) {
+			super(s);
+		}
+	}
+
 	/**
 	 * Default stack size for the data stack.
 	 *
@@ -113,10 +120,6 @@ public class Coroutine implements Runnable, Serializable {
 		this.runnable = runnable;
 		this.stack = new Stack(this, stackSize);
 		this.state = State.NEW;
-
-		if (runnable == null) {
-			throw new NullPointerException("runnable");
-		}
 	}
 
 	/**
@@ -152,7 +155,7 @@ public class Coroutine implements Runnable, Serializable {
 	 */
 	public void run() {
 		if (state != State.NEW && state != State.SUSPENDED) {
-			throw new AssertionError("Coroutine is not new or suspended.");
+			throw new Error("Coroutine is not new or suspended.");
 		}
 		State result = State.FINISHED;
 		final Stack oldStack = Stack.getStack();
@@ -174,7 +177,7 @@ public class Coroutine implements Runnable, Serializable {
 
 	private void writeObject(final java.io.ObjectOutputStream out) throws IOException {
 		if (state == State.RUNNING) {
-			throw new IllegalStateException("trying to serialize a running coroutine");
+			throw new Error("Running coroutines may not be serialized");
 		}
 		out.defaultWriteObject();
 	}

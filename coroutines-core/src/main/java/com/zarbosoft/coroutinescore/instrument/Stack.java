@@ -175,9 +175,6 @@ public final class Stack implements Serializable {
 		return dataObject[curMethodSP + idx];
 	}
 
-	/**
-	 * called when resuming a stack
-	 */
 	public final void resumeStack() {
 		methodTOS = -1;
 	}
