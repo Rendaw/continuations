@@ -107,7 +107,7 @@ public class InstrumentMethod {
 			if (f == null)
 				continue; // reachable ?
 
-			MethodInsnNode node;
+			final MethodInsnNode node;
 			{
 				final AbstractInsnNode node1 = mn.instructions.get(i);
 				if (node1.getType() != AbstractInsnNode.METHOD_INSN)
@@ -129,33 +129,13 @@ public class InstrumentMethod {
 					node.desc,
 					opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKESTATIC
 			)) {
-				if (!"com/zarbosoft/coroutinescore/Coroutine".equals(className) &&
-						!"reflectInvoke".equals(mn.name) &&
-						isReflectInvoke) {
-					db.log(
-							LogLevel.DEBUG,
-							"Replacing reflect invoke method at instruction %d with wrapper; assumed suspendable",
-							i
-					);
-					// The wrapper has the same stack input as Method.invoke so all that needs to be done
-					// is replace the instruction with an invokestatic
-					final AbstractInsnNode oldNode = node;
-					node = new MethodInsnNode(Opcodes.INVOKESTATIC,
-							"com/zarbosoft/coroutinescore/Coroutine",
-							"reflectInvoke",
-							"(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;",
-							false
-					);
-					mn.instructions.set(oldNode, node);
-				} else {
-					db.log(LogLevel.DEBUG,
-							"Method call at instruction %d to %s#%s%s is suspendable",
-							i,
-							node.owner,
-							node.name,
-							node.desc
-					);
-				}
+				db.log(LogLevel.DEBUG,
+						"Method call at instruction %d to %s#%s%s is suspendable",
+						i,
+						node.owner,
+						node.name,
+						node.desc
+				);
 				suspensions.add(new Suspension(f, firstLocal, node, mn.instructions, db));
 				continue;
 			}
@@ -436,13 +416,13 @@ public class InstrumentMethod {
 			outputLast = suspension.node;
 
 			final MethodInsnNode min = (MethodInsnNode) suspension.node;
+			emitStoreState(mv, i + 1, suspension);
 			if (InstrumentClass.COROUTINE_NAME.equals(min.owner) && "yield".equals(min.name)) {
 				// Direct call to Coroutine.yield
 				// Replace with custom instructions
 				if (min.getOpcode() != Opcodes.INVOKESTATIC) {
 					throw new UnableToInstrumentException("invalid call to yield()", className, mn.name, mn.desc);
 				}
-				emitStoreState(mv, i + 1, suspension);
 				mv.visitFieldInsn(Opcodes.GETSTATIC,
 						STACK_NAME,
 						"exception_instance_not_for_user_code",
@@ -451,15 +431,17 @@ public class InstrumentMethod {
 				mv.visitInsn(Opcodes.ATHROW);
 				//min.accept(mv); // only the call
 				mv.visitLabel(lMethodCalls[i]);
-				emitRestoreState(mv, suspension);
 				outputLast = outputLast.getNext(); // Skip the suspended call itself
+			} else if (suspension.isReflective) {
+				// Suspendable method(?)
+				// Need to unpack InvocationTargetException and reraise SuspendExecution only if that's the inner exc
+
 			} else {
 				// Suspendable method
 				// Reenter the method upon resuming
-				emitStoreState(mv, i + 1, suspension);
 				mv.visitLabel(lMethodCalls[i]);
-				emitRestoreState(mv, suspension);
 			}
+			emitRestoreState(mv, suspension);
 		}
 		outputNodesBetween.go(outputLast, null);
 
