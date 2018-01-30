@@ -234,4 +234,51 @@ public class MethodTypesTest {
 		coroutine.run();
 		assertThat(b.toString(), equalTo("ab"));
 	}
+
+	public void testRefMethod(final StringBuilder b) throws SuspendExecution {
+		b.append("y");
+		Coroutine.yield();
+		b.append("z");
+	}
+
+	@FunctionalInterface
+	interface SuspendableConsumer {
+		void x(StringBuilder b) throws SuspendExecution;
+	}
+
+	@Test
+	public void testReference() {
+		final StringBuilder b = new StringBuilder();
+		final SuspendableConsumer inner = this::testRefMethod;
+		final Coroutine coroutine = new Coroutine(() -> {
+			b.append("a");
+			inner.x(b);
+			b.append("b");
+		});
+		coroutine.run();
+		assertThat(b.toString(), equalTo("ay"));
+		coroutine.run();
+		assertThat(b.toString(), equalTo("ayzb"));
+	}
+
+	public static void testRefStaticMethod(final StringBuilder b) throws SuspendExecution {
+		b.append("y");
+		Coroutine.yield();
+		b.append("z");
+	}
+
+	@Test
+	public void testStaticReference() {
+		final StringBuilder b = new StringBuilder();
+		final SuspendableConsumer inner = MethodTypesTest::testRefStaticMethod;
+		final Coroutine coroutine = new Coroutine(() -> {
+			b.append("a");
+			inner.x(b);
+			b.append("b");
+		});
+		coroutine.run();
+		assertThat(b.toString(), equalTo("ay"));
+		coroutine.run();
+		assertThat(b.toString(), equalTo("ayzb"));
+	}
 }

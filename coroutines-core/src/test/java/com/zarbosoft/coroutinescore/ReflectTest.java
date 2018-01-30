@@ -9,32 +9,61 @@ import static org.hamcrest.core.IsEqual.equalTo;
 import static org.junit.Assert.assertThat;
 
 public class ReflectTest {
-	public static Method method;
+	public static Method methodSuspend;
+	public static Method methodNoSuspend;
 
 	static {
 		try {
-			method = ReflectTest.class.getMethod("method");
+			methodSuspend = ReflectTest.class.getMethod("methodSuspend", StringBuilder.class);
+			methodNoSuspend = ReflectTest.class.getMethod("methodNoSuspend", StringBuilder.class);
 		} catch (final NoSuchMethodException e) {
 			throw new RuntimeException(e);
 		}
 	}
 
-	public void method() throws SuspendExecution {
+	public void methodSuspend(final StringBuilder b) throws SuspendExecution {
+		b.append("b");
 		Coroutine.yield();
+		b.append("c");
+	}
+
+	public void methodNoSuspend(final StringBuilder b) throws SuspendExecution {
+		b.append("b");
 	}
 
 	@Test
 	public void testSuspend() throws NoSuchMethodException {
+		final StringBuilder b = new StringBuilder();
 		final Coroutine co = new Coroutine(() -> {
 			try {
-				method.invoke(ReflectTest.this);
+				b.append("a");
+				methodSuspend.invoke(ReflectTest.this, b);
+				b.append("d");
 			} catch (final Exception e) {
 				throw new RuntimeException(e);
 			}
 		});
 		co.run();
+		assertThat(b.toString(), equalTo("ab"));
 		co.run();
+		assertThat(b.toString(), equalTo("abcd"));
 		assertThat(co.getState(), equalTo(FINISHED));
 	}
 
+	@Test
+	public void testNoSuspend() throws NoSuchMethodException {
+		final StringBuilder b = new StringBuilder();
+		final Coroutine co = new Coroutine(() -> {
+			try {
+				b.append("a");
+				methodNoSuspend.invoke(ReflectTest.this, b);
+				b.append("c");
+			} catch (final Exception e) {
+				throw new RuntimeException(e);
+			}
+		});
+		co.run();
+		assertThat(b.toString(), equalTo("abc"));
+		assertThat(co.getState(), equalTo(FINISHED));
+	}
 }
