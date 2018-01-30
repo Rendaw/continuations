@@ -36,7 +36,10 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 import org.objectweb.asm.tree.analysis.*;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
+
+import static org.objectweb.asm.Opcodes.*;
 
 /**
  * Instrument a method to allow suspension
@@ -55,6 +58,7 @@ public class InstrumentMethod {
 	private final int firstLocal;
 
 	private final List<Suspension> suspensions = new ArrayList<>();
+	private final List<TryCatchBlockNode> reflectExceptRanges = new ArrayList<>();
 	private int additionalLocals;
 
 	private boolean warnedAboutMonitors;
@@ -102,7 +106,6 @@ public class InstrumentMethod {
 
 		// Check instructions, find suspending nodes
 		for (int i = 0; i < mn.instructions.size(); ++i) {
-			System.out.format("all %s\n", mn.instructions.get(i));
 			final Frame f = frames[i];
 			if (f == null)
 				continue; // reachable ?
@@ -124,11 +127,12 @@ public class InstrumentMethod {
 			// Find suspending node
 			final int opcode = node.getOpcode();
 			final boolean isReflectInvoke = "java/lang/reflect/Method".equals(node.owner) && "invoke".equals(node.name);
-			if (isReflectInvoke || db.isMethodSuspendable(node.owner,
-					node.name,
-					node.desc,
-					opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKESTATIC
-			)) {
+			if (isReflectInvoke ||
+					db.isMethodSuspendable(node.owner,
+							node.name,
+							node.desc,
+							opcode == INVOKEVIRTUAL || opcode == Opcodes.INVOKESTATIC
+					)) {
 				db.log(LogLevel.DEBUG,
 						"Method call at instruction %d to %s#%s%s is suspendable",
 						i,
@@ -136,7 +140,7 @@ public class InstrumentMethod {
 						node.name,
 						node.desc
 				);
-				suspensions.add(new Suspension(f, firstLocal, node, mn.instructions, db));
+				suspensions.add(new Suspension(f, firstLocal, node, mn.instructions, db, isReflectInvoke));
 				continue;
 			}
 
@@ -173,15 +177,9 @@ public class InstrumentMethod {
 		// Split exception ranges around suspending nodes
 		// Modifies the instruction + try catch block node lists so done after initial scan
 		{
-			System.out.format("in %s suspends %s, exception ranges %s\n",
-					mn.name,
-					suspensions.size(),
-					mn.tryCatchBlocks.size()
-			);
 			final ListIterator<TryCatchBlockNode> rangeListPosition = mn.tryCatchBlocks.listIterator();
 			while (rangeListPosition.hasNext()) {
 				final TryCatchBlockNode range = rangeListPosition.next();
-				System.out.format("range %s %s\n", range.start, range.end);
 				final LabelNode originalEnd = range.end;
 				AbstractInsnNode at = range.start;
 
@@ -225,14 +223,6 @@ public class InstrumentMethod {
 
 					// Find the suspending node
 					for (; at != originalEnd; at = at.getNext()) {
-						if (at instanceof MethodInsnNode) {
-							System.out.format("I %s %s %s\n",
-									at,
-									((MethodInsnNode) at).owner,
-									((MethodInsnNode) at).name
-							);
-						} else
-							System.out.format("I %s\n", at);
 						if (isMetaInst(at))
 							continue;
 						if (at == nextSuspension.node)
@@ -242,39 +232,13 @@ public class InstrumentMethod {
 					if (at != nextSuspension.node)
 						break;
 
-					// Make try block encompass statements between suspensions
-					if (adjustRanges.nonMetaCount > 0) {
-						System.out.format("before range count: %s\n", adjustRanges.nonMetaCount);
-						adjustRanges.finishRange(at);
+					if (nextSuspension.isReflective) {
+						reflectExceptRanges.add(new TryCatchBlockNode(nextSuspension.reflectStart,
+								nextSuspension.reflectEnd,
+								nextSuspension.reflectExceptHandle,
+								Type.getInternalName(InvocationTargetException.class)
+						));
 					}
-				}
-
-				// Check to see if any non-meta instructions are in range after last suspend
-				if (at != originalEnd)
-					at = at.getNext(); // Skip last suspension
-				if (at instanceof MethodInsnNode) {
-					System.out.format("I2 %s %s %s\n", at, ((MethodInsnNode) at).owner, ((MethodInsnNode) at).name);
-				} else
-					System.out.format("I2 %s\n", at);
-				for (; at != originalEnd; at = at.getNext()) {
-					if (at instanceof MethodInsnNode) {
-						System.out.format("I3 %s %s %s\n", at, ((MethodInsnNode) at).owner, ((MethodInsnNode) at).name);
-					} else
-						System.out.format("I3 %s\n", at);
-					if (isMetaInst(at))
-						continue;
-					adjustRanges.nonMetaCount += 1;
-					//break;
-				}
-
-				if (adjustRanges.nonMetaCount > 0) {
-					System.out.format("final range count: %s\n", adjustRanges.nonMetaCount);
-					// Make try block encompass final range (node == range.end ~ exclusive)
-					adjustRanges.finishRange(originalEnd);
-				} else if (adjustRanges.useBlock != null) {
-					System.out.format("range was empty; deleting\n");
-					// Try block was empty before and after, remove
-					rangeListPosition.remove();
 				}
 			}
 		}
@@ -303,8 +267,10 @@ public class InstrumentMethod {
 		// Output setup code
 		mv.visitTryCatchBlock(lMethodStart, lMethodEnd, lCatchSEE, CheckInstrumentationVisitor.EXCEPTION_NAME);
 
-		for (final Object o : mn.tryCatchBlocks) {
-			final TryCatchBlockNode tcb = (TryCatchBlockNode) o;
+		for (final TryCatchBlockNode tcb : reflectExceptRanges) {
+			tcb.accept(mv);
+		}
+		for (final TryCatchBlockNode tcb : mn.tryCatchBlocks) {
 			if (CheckInstrumentationVisitor.EXCEPTION_NAME.equals(tcb.type)) {
 				throw new UnableToInstrumentException("catch for " + SuspendExecution.class.getSimpleName(),
 						className,
@@ -337,7 +303,7 @@ public class InstrumentMethod {
 		mv.visitInsn(Opcodes.DUP);
 		mv.visitVarInsn(Opcodes.ASTORE, lvarStack);
 
-		mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "nextMethodEntry", "()I");
+		mv.visitMethodInsn(INVOKEVIRTUAL, STACK_NAME, "nextMethodEntry", "()I");
 		final Label[] lMethodCalls = new Label[suspensions.size()];
 		for (int i = 0; i < suspensions.size(); ++i) {
 			lMethodCalls[i] = new Label();
@@ -428,20 +394,42 @@ public class InstrumentMethod {
 						"exception_instance_not_for_user_code",
 						CheckInstrumentationVisitor.EXCEPTION_DESC
 				);
-				mv.visitInsn(Opcodes.ATHROW);
-				//min.accept(mv); // only the call
+				mv.visitInsn(ATHROW);
 				mv.visitLabel(lMethodCalls[i]);
-				outputLast = outputLast.getNext(); // Skip the suspended call itself
-			} else if (suspension.isReflective) {
-				// Suspendable method(?)
-				// Need to unpack InvocationTargetException and reraise SuspendExecution only if that's the inner exc
-
+				emitRestoreState(mv, suspension);
+				outputLast = outputLast.getNext();
 			} else {
 				// Suspendable method
 				// Reenter the method upon resuming
 				mv.visitLabel(lMethodCalls[i]);
+				emitRestoreState(mv, suspension);
+				outputLast = outputLast.getNext();
+				if (suspension.isReflective)
+					mv.visitLabel(suspension.reflectStart.getLabel());
+				outputNodesBetween.go(suspension.node, outputLast);
+				if (suspension.isReflective) {
+					// If a reflective call, unpack SuspendException from the InocationTargetException
+					mv.visitLabel(suspension.reflectEnd.getLabel());
+					mv.visitJumpInsn(GOTO, suspension.reflectContinue.getLabel());
+					mv.visitLabel(suspension.reflectExceptHandle.getLabel());
+					mv.visitInsn(Opcodes.DUP);
+					mv.visitMethodInsn(INVOKEVIRTUAL,
+							Type.getInternalName(InvocationTargetException.class),
+							"getCause",
+							"()Ljava/lang/Throwable;",
+							false
+					);
+					mv.visitInsn(Opcodes.DUP);
+					mv.visitTypeInsn(INSTANCEOF, CheckInstrumentationVisitor.EXCEPTION_NAME);
+					final LabelNode notSuspendLabel = new LabelNode();
+					mv.visitJumpInsn(IFEQ, notSuspendLabel.getLabel());
+					mv.visitInsn(ATHROW);
+					mv.visitLabel(notSuspendLabel.getLabel());
+					mv.visitInsn(Opcodes.POP);
+					mv.visitInsn(ATHROW);
+					mv.visitLabel(suspension.reflectContinue.getLabel());
+				}
 			}
-			emitRestoreState(mv, suspension);
 		}
 		outputNodesBetween.go(outputLast, null);
 
@@ -451,7 +439,7 @@ public class InstrumentMethod {
 		mv.visitLabel(lCatchAll);
 		emitPopMethod(mv);
 		mv.visitLabel(lCatchSEE);
-		mv.visitInsn(Opcodes.ATHROW);   // rethrow shared between catchAll and catchSSE
+		mv.visitInsn(ATHROW);   // rethrow shared between catchAll and catchSSE
 
 		if (mn.localVariables != null) {
 			for (final Object o : mn.localVariables) {
@@ -518,15 +506,15 @@ public class InstrumentMethod {
 	}
 
 	private void emitPopMethod(final MethodVisitor mv) {
-		mv.visitVarInsn(Opcodes.ALOAD, lvarStack);
-		mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "popMethod", "()V");
+		mv.visitVarInsn(ALOAD, lvarStack);
+		mv.visitMethodInsn(INVOKEVIRTUAL, STACK_NAME, "popMethod", "()V");
 	}
 
 	private void emitStoreState(final MethodVisitor mv, final int jumpTableIndex, final Suspension suspension) {
-		mv.visitVarInsn(Opcodes.ALOAD, lvarStack);
+		mv.visitVarInsn(ALOAD, lvarStack);
 		emitConst(mv, jumpTableIndex);
 		emitConst(mv, suspension.numSlots);
-		mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "pushMethodAndReserveSpace", "(II)V");
+		mv.visitMethodInsn(INVOKEVIRTUAL, STACK_NAME, "pushMethodAndReserveSpace", "(II)V");
 
 		for (int i = suspension.frame.getStackSize(); i-- > 0; ) {
 			final BasicValue v = (BasicValue) suspension.frame.getStack(i);
@@ -611,51 +599,51 @@ public class InstrumentMethod {
 				throw new InternalError("Unexpected type: " + v.getType());
 		}
 
-		mv.visitVarInsn(Opcodes.ALOAD, lvarStack);
+		mv.visitVarInsn(ALOAD, lvarStack);
 		emitConst(mv, idx);
 		mv.visitMethodInsn(Opcodes.INVOKESTATIC, STACK_NAME, "push", desc);
 	}
 
 	private void emitRestoreValue(final MethodVisitor mv, final BasicValue v, final int lvarStack, final int idx) {
-		mv.visitVarInsn(Opcodes.ALOAD, lvarStack);
+		mv.visitVarInsn(ALOAD, lvarStack);
 		emitConst(mv, idx);
 
 		switch (v.getType().getSort()) {
 			case Type.OBJECT:
 				final String internalName = v.getType().getInternalName();
-				mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "getObject", "(I)Ljava/lang/Object;");
+				mv.visitMethodInsn(INVOKEVIRTUAL, STACK_NAME, "getObject", "(I)Ljava/lang/Object;");
 				if (!internalName.equals("java/lang/Object")) {  // don't cast to Object ;)
-					mv.visitTypeInsn(Opcodes.CHECKCAST, internalName);
+					mv.visitTypeInsn(CHECKCAST, internalName);
 				}
 				break;
 			case Type.ARRAY:
-				mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "getObject", "(I)Ljava/lang/Object;");
-				mv.visitTypeInsn(Opcodes.CHECKCAST, v.getType().getDescriptor());
+				mv.visitMethodInsn(INVOKEVIRTUAL, STACK_NAME, "getObject", "(I)Ljava/lang/Object;");
+				mv.visitTypeInsn(CHECKCAST, v.getType().getDescriptor());
 				break;
 			case Type.BYTE:
-				mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "getInt", "(I)I");
+				mv.visitMethodInsn(INVOKEVIRTUAL, STACK_NAME, "getInt", "(I)I");
 				mv.visitInsn(Opcodes.I2B);
 				break;
 			case Type.SHORT:
-				mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "getInt", "(I)I");
+				mv.visitMethodInsn(INVOKEVIRTUAL, STACK_NAME, "getInt", "(I)I");
 				mv.visitInsn(Opcodes.I2S);
 				break;
 			case Type.CHAR:
-				mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "getInt", "(I)I");
+				mv.visitMethodInsn(INVOKEVIRTUAL, STACK_NAME, "getInt", "(I)I");
 				mv.visitInsn(Opcodes.I2C);
 				break;
 			case Type.BOOLEAN:
 			case Type.INT:
-				mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "getInt", "(I)I");
+				mv.visitMethodInsn(INVOKEVIRTUAL, STACK_NAME, "getInt", "(I)I");
 				break;
 			case Type.FLOAT:
-				mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "getFloat", "(I)F");
+				mv.visitMethodInsn(INVOKEVIRTUAL, STACK_NAME, "getFloat", "(I)F");
 				break;
 			case Type.LONG:
-				mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "getLong", "(I)J");
+				mv.visitMethodInsn(INVOKEVIRTUAL, STACK_NAME, "getLong", "(I)J");
 				break;
 			case Type.DOUBLE:
-				mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, STACK_NAME, "getDouble", "(I)D");
+				mv.visitMethodInsn(INVOKEVIRTUAL, STACK_NAME, "getDouble", "(I)D");
 				break;
 			default:
 				throw new InternalError("Unexpected type: " + v.getType());
@@ -688,16 +676,29 @@ public class InstrumentMethod {
 		final int numObjSlots;
 		final int[] localSlotIndices;
 		final int[] stackSlotIndices;
+		final boolean isReflective;
+		LabelNode reflectStart;
+		LabelNode reflectEnd;
+		LabelNode reflectExceptHandle;
+		LabelNode reflectContinue;
 
 		Suspension(
 				final Frame f,
 				final int firstLocal,
 				final AbstractInsnNode node,
 				final InsnList insnList,
-				final MethodDatabase db
+				final MethodDatabase db,
+				final boolean isReflective
 		) {
 			this.frame = f;
 			this.node = node;
+			this.isReflective = isReflective;
+			if (isReflective) {
+				reflectStart = new LabelNode();
+				reflectEnd = new LabelNode();
+				reflectExceptHandle = new LabelNode();
+				reflectContinue = new LabelNode();
+			}
 
 			int idxObj = 0;
 			int idxPrim = 0;
