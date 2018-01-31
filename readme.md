@@ -16,7 +16,7 @@ I recommend using `com.zarbosoft.coroutines` for a slightly more usable solution
 <dependency>
     <groupId>com.zarbosoft</groupId>
     <artifactId>coroutinescore</artifactId>
-    <version>0.0.4</version>
+    <version>0.0.6</version>
 </dependency>
 ```
 
@@ -65,6 +65,8 @@ hi 2
 ```
 
 # Usage
+
+Make suspendable methods by adding `throws SuspendExecution` to the signature.  Suspendable methods can be called from other suspendable methods.  Don't catch `SuspendExecution` explicitly (catching a less specific exception class such as `Exception` or `Throwable` is fine).
 
 Classes and methods that can be suspended need to be instrumented.  This can either be done with a Java agent at runtime, as each class is loaded, or at compile time with an instrumentation step.
 
@@ -157,7 +159,7 @@ Add the following to your `pom.xml`:
         <dependency>
             <groupId>com.zarbosoft</groupId>
             <artifactId>coroutinescore</artifactId>
-            <version>0.0.4</version>
+            <version>0.0.6</version>
         </dependency>
     </dependencies>
     <executions>
