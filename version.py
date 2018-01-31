@@ -18,12 +18,13 @@ def replace(path, *replacements):
     temp = '{}.1'.format(path)
     with open(temp, 'w') as dest:
         dest.write(text)
-    shutil.move(temp, 'readme.md')
+    print(text)
+    shutil.move(temp, path)
 
 
 mvnver = [
-    '<artifactId>coroutinescore</artifactId>([^<]*)<version>[^<]+</version>',  # noqa
-    '<artifactId>coroutinescore</artifactId>\\1<version>{}</version>'.format(args.version),  # noqa
+    '<artifactId>coroutines-core</artifactId>([^<]*)<version>[^<]+</version>',  # noqa
+    '<artifactId>coroutines-core</artifactId>\\1<version>{}</version>'.format(args.version),  # noqa
 ]
 replace('readme.md', mvnver)
 replace('coroutines-core/pom.xml', mvnver)

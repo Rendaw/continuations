@@ -15,8 +15,8 @@ I recommend using `com.zarbosoft.coroutines` for a slightly more usable solution
 ```
 <dependency>
     <groupId>com.zarbosoft</groupId>
-    <artifactId>coroutinescore</artifactId>
-    <version>0.0.7</version>
+    <artifactId>coroutines-core</artifactId>
+    <version>0.0.8</version>
 </dependency>
 ```
 
@@ -73,6 +73,8 @@ Classes and methods that can be suspended need to be instrumented.  This can eit
 Compile time instrumentation is simpler since it has fewer moving parts and you can troubleshoot any assembly issues before distribution.
 
 Runtime instrumentation is more flexible - it can deal with code hotswaps and non-Maven build environments (like IDE incremental compilation), but you need to pass the agent as a JVM argument whenever you execute the code.
+
+When distributing libraries, compile-time instrument your classes before packaging.
 
 ## Compile time instrumentation
 
@@ -158,8 +160,8 @@ Add the following to your `pom.xml`:
     <dependencies>
         <dependency>
             <groupId>com.zarbosoft</groupId>
-            <artifactId>coroutinescore</artifactId>
-            <version>0.0.7</version>
+            <artifactId>coroutines-core</artifactId>
+            <version>0.0.8</version>
         </dependency>
     </dependencies>
     <executions>
@@ -170,7 +172,7 @@ Add the following to your `pom.xml`:
                 <tasks>
                     <taskdef name="instrumentationTask"
                              classname="com.zarbosoft.coroutinescore.instrument.InstrumentationTask"
-                             classpath="${maven.dependency.classpath}"/>
+                             classpathref="maven.dependency.classpath"/>
                     <instrumentationTask>
                         <fileset dir="${project.build.directory}/classes/" includes="**/*.class"/>
                     </instrumentationTask>
