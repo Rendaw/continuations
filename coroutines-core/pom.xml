@@ -117,7 +117,7 @@
         <dependency>
             <groupId>com.zarbosoft</groupId>
             <artifactId>coroutines-core-testagentjar</artifactId>
-            <version>0.0.7</version>
+            <version>0.0.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
