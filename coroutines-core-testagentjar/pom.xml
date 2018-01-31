@@ -6,13 +6,7 @@
 
     <groupId>com.zarbosoft</groupId>
     <artifactId>coroutines-core-testagentjar</artifactId>
-    <version>0.0.6</version>
-    <parent>
-        <groupId>com.zarbosoft</groupId>
-        <artifactId>coroutines-core-parent</artifactId>
-        <version>0.0.6</version>
-        <relativePath>../pom.xml</relativePath>
-    </parent>
+    <version>0.0.0</version>
     <build>
         <plugins>
             <plugin>

@@ -6,7 +6,7 @@
 
     <groupId>com.zarbosoft</groupId>
     <artifactId>coroutines-core</artifactId>
-    <version>0.0.6</version>
+    <version>0.0.7</version>
     <name>${project.groupId}:${project.artifactId}</name>
     <description>Coroutines in Java</description>
     <url>https://github.com/rendaw/java-coroutines-core</url>
@@ -39,12 +39,6 @@
             <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
         </repository>
     </distributionManagement>
-    <parent>
-        <groupId>com.zarbosoft</groupId>
-        <artifactId>coroutines-core-parent</artifactId>
-        <version>0.0.6</version>
-        <relativePath>../pom.xml</relativePath>
-    </parent>
     <build>
         <plugins>
             <plugin>
@@ -123,7 +117,7 @@
         <dependency>
             <groupId>com.zarbosoft</groupId>
             <artifactId>coroutines-core-testagentjar</artifactId>
-            <version>0.0.6</version>
+            <version>0.0.7</version>
             <scope>test</scope>
         </dependency>
         <dependency>

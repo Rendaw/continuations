@@ -16,7 +16,7 @@ I recommend using `com.zarbosoft.coroutines` for a slightly more usable solution
 <dependency>
     <groupId>com.zarbosoft</groupId>
     <artifactId>coroutinescore</artifactId>
-    <version>0.0.6</version>
+    <version>0.0.7</version>
 </dependency>
 ```
 
@@ -159,7 +159,7 @@ Add the following to your `pom.xml`:
         <dependency>
             <groupId>com.zarbosoft</groupId>
             <artifactId>coroutinescore</artifactId>
-            <version>0.0.6</version>
+            <version>0.0.7</version>
         </dependency>
     </dependencies>
     <executions>
