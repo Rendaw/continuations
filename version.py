@@ -26,5 +26,12 @@ mvnver = [
     '<artifactId>coroutines-core</artifactId>([^<]*)<version>[^<]+</version>',  # noqa
     '<artifactId>coroutines-core</artifactId>\\1<version>{}</version>'.format(args.version),  # noqa
 ]
-replace('readme.md', mvnver)
+replace(
+    'readme.md',
+    mvnver,
+    [
+        'coroutines-core-[0-9.]+\\.jar',
+        'coroutines-core-{}.jar'.format(args.version),
+    ],
+)
 replace('coroutines-core/pom.xml', mvnver)

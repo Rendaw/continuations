@@ -8,9 +8,9 @@ Source mapping isn't affected by coroutine instrumentation so debugging and trac
 
 Coroutines are serializable.
 
-# Maven
+This package barebones.  I hope that more fully-featured toolkits and integrations with libraries such as Xnio can use this as a base, and if a better implementation comes out by keeping this small it will be easy to replace.  My recommended extension is [com.zarbosoft.coroutines](https://github.com/rendaw/java-coroutines).
 
-I recommend using `com.zarbosoft.coroutines` for a slightly more usable solution, but if you want to use this directly:
+# Maven
 
 ```
 <dependency>
@@ -43,13 +43,10 @@ public static void main(final String[] args) throws Exception {
             .set(Options.WORKER_TASK_MAX_THREADS, 1)
             .set(Options.WORKER_IO_THREADS, 1)
             .getMap());
-    new Coroutine(new CoroutineProto() {
-        @Override
-        public void coExecute() throws SuspendExecution {
-            for (int i = 0; i < 3; ++i) {
-                System.out.format("hi %s\n", i);
-                sleep(worker, 1, TimeUnit.SECONDS);
-            }
+    new Coroutine(() -> {
+        for (int i = 0; i < 3; ++i) {
+            System.out.format("hi %s\n", i);
+            sleep(worker, 1, TimeUnit.SECONDS);
         }
     }).run();
     worker.awaitTermination();
@@ -64,23 +61,27 @@ hi 1
 hi 2
 ```
 
-# Usage
+# Programming with coroutines
 
 Make suspendable methods by adding `throws SuspendExecution` to the signature.  Suspendable methods can be called from other suspendable methods.  Don't catch `SuspendExecution` explicitly (catching a less specific exception class such as `Exception` or `Throwable` is fine).
 
+Start a coroutine by creating a `Coroutine` with a suspendable method as a starting point and call `run` to start it and block until it suspends.  Suspended coroutines can be restarted with `run`.
+
+# Running your code
+
 Classes and methods that can be suspended need to be instrumented.  This can either be done with a Java agent at runtime, as each class is loaded, or at compile time with an instrumentation step.
 
-Compile time instrumentation is simpler since it has fewer moving parts and you can troubleshoot any assembly issues before distribution.
+**Compile time** instrumentation is simpler since it has fewer moving parts and you can troubleshoot any assembly issues before distribution.  It also may improve startup times slightly.
 
-Runtime instrumentation is more flexible - it can deal with code hotswaps and non-Maven build environments (like IDE incremental compilation), but you need to pass the agent as a JVM argument whenever you execute the code.
+**Runtime instrumentation** is more flexible - it can deal with code hotswaps and Maven build environments that can't use the Ant instrumentation task, but you need to pass the agent as a JVM argument whenever you execute the code.
 
-When distributing libraries, compile-time instrument your classes before packaging.
+Compile and runtime instrumentation can be mixed, so you can use preinstrumented classes with the runtime agent.
 
-## Compile time instrumentation
+I suggest compile-time libraries you are distributing since it makes downstream compile time instrumentation simpler.
 
-#### In a single module project
+## Compile-time instrumentation
 
-Add the following to your `pom.xml`:
+Compile-time instrumentation uses an Ant Task to modify the class files. Add the following to your `pom.xml`:
 
 ```
 <plugin>
@@ -101,13 +102,13 @@ Add the following to your `pom.xml`:
     <artifactId>maven-antrun-plugin</artifactId>
     <executions>
         <execution>
-            <id>coroutines-instrument-classes</id>
+            <id>coroutines-instrument</id>
             <phase>compile</phase>
             <configuration>
                 <tasks>
                     <taskdef name="instrumentationTask"
                              classname="com.zarbosoft.coroutinescore.instrument.InstrumentationTask"
-                             classpath="${maven.dependency.classpath}"/>
+                             classpathref="maven.dependency.classpath"/>
                     <instrumentationTask>
                         <fileset dir="${project.build.directory}/classes/" includes="**/*.class"/>
                     </instrumentationTask>
@@ -121,13 +122,35 @@ Add the following to your `pom.xml`:
 </plugin>
 ```
 
-#### In a multi-module project
+#### Verbose output
 
-To determine the coroutine inheritance and call hierarchy instrumentation must be done in one step (you can't instrument each module separately).  The following shows how to do this by unpacking dependencies that need to be instrumented (or all of them, to make things simpler) before the instrumentation step.
+Change `<instrumentationTask>` to `<instrumentationTask verbose="true">`.
 
-If you don't want to combine all dependencies into your final jar, you can exclude/include classes to unpack in `maven-dependency-plugin`.
+#### Bytecode verification
 
-Add the following to your `pom.xml`:
+Change `<instrumentationTask>` to `<instrumentationTask check="true">`.
+
+#### Instrumenting test classes
+
+If you want to instrument your test classes as well, copy the `coroutines-instrument` execution as a second execution with id `coroutines-instrument-tests` (or something else of your choice).
+
+Change the `fileset` to
+
+```
+<fileset dir="${project.build.directory}/test-classes/" includes="**/*.class"/>
+```
+
+and `phase` to `test-compile`.
+
+#### Dealing with uninstrumented dependencies
+
+There's no easy way to do this, but the following works alright.  Basically:
+
+* Unpack the dependencies that need to be instrumented (or all of them) into your classes directory
+* Instrument everything
+* Create a semi-uber jar with the instrumented classes, excluding those dependencies
+
+Since it's easiest to unpack and instrument everything, I'll demonstrate that. Add the following to your `pom.xml`:
 
 ```
 <plugin>
@@ -186,16 +209,44 @@ Add the following to your `pom.xml`:
 </plugin>
 ```
 
+Then the default maven-jar-plugin execution will combine everything into a single jar.
+
 ## Runtime instrumentation
 
 There are three requirements for runtime instrumentation:
 1. `com.zarbosoft.coroutinescore.instrument.JavaAgent` is in your classpath, probably by adding it as a dependency
 2. You have a jar with a `META-INF/MANIFEST.MF` file with the line `Premain-Class: com.zarbosoft.coroutinescore.instrument.JavaAgent`
-3. You start the JVM with `java -javaagent:/requirement/2/jar.jar -jar target/yourapp.jar`
+3. You start the JVM with the flag `-javaagent:/requirement/2/file.jar`
 
-Since 1 and 2 are handled by the Coroutines jar, all you have to do is add the `-javaagent` argument and specify the same jar in both locations for 3.
+If the coroutines-core jar is in your classpath 1 and 2 are complete and all you have to do is add the `-javaagent` argument and specify the same jar in both locations for 3.
 
-To run tests in Maven with the agent you can use
+For example, with maven:
+
+```
+java -javaagent:/home/you/.m2/repository/com/zarbosoft/coroutines-core/coroutines-core-0.0.8.jar -jar myjar.jar
+```
+
+#### Verbose output
+
+Add the option `=v` after the jar:
+
+```
+java -javaagent:/home/you/.m2/repository/com/zarbosoft/coroutines-core/coroutines-core-0.0.8.jar=v -jar myjar.jar
+```
+
+#### Bytecode verification
+
+Add the option `=c` after the jar:
+
+```
+java -javaagent:/home/you/.m2/repository/com/zarbosoft/coroutines-core/coroutines-core-0.0.8.jar=c -jar myjar.jar
+```
+
+Flags can be combined, like `=cv` for verbose output and bytecode verification.
+
+#### Instrumenting test classes
+
+This is an alternative to compile-time test class instrumentation.  Add the following to your `pom.xml`:
 
 ```
 <plugin>
@@ -225,20 +276,20 @@ You can use something similar with the `maven-exec-plugin` if you use that for r
 
 #### Note:
 
-It's possible to install the agent into the classloader programmatically but I haven't tried it myself.  In this case you need to be careful that no classes to be instrumented are loaded until after installing the agent.
+It's also possible to install the agent into the classloader programmatically but I haven't tried it myself.  In this case you need to be careful that no classes to be instrumented are loaded until after installing the agent.
 
 # How it works
 
-1. During suspendable method execution, every stack change (local created, local de-scoped) is mirrored in a thread-local coroutine `Stack` class.
+1. Before every suspendable call, the coroutine state (local variables, stack variables) are saved to a thread-local `Stack` object.
 2. `Coroutine.yield()` records the position (instruction index) then raises `SuspendException`.  The stack unwinds normally back to the method that called `coroutine.run`, where normal flow continues.  The stack before yielding is still stored in the coroutine's `Stack`.
 3. Instrumentation adds a jump table to each suspendable call to each suspendable method.
-4. Resuming the coroutine calls the root function again.  Each function in the previous is re-entered via the jump table at the start of the caller function, and the final jump table moves the instruction pointer to directly after the `yield` call.
+4. Resuming the coroutine calls the root function again.  Each function restores the latest state from the `Stack` and jumps back to where it was.  If a method call was suspended, the method is re-entered and it repeates the stack restore and jump.  The final method's jump table moves the instruction pointer to directly after the `yield` call.
 
 # History
 
-This is fairly barebones, and I stripped out some classes (Coiterator) to make it even moreso.  I hope that more fully-featured toolkits and integrations with libraries such as Xnio can use this as a base, and if a better implementation comes out by keeping this small it will be easy to replace.
+This is fairly barebones, and I stripped out some classes (Coiterator) to make it even moreso.  I hope that more fully-featured toolkits and integrations with libraries such as Xnio can use this as a base, and if a better implementation comes out by keeping this small it will be easy to replace.  My own wrapper is [com.zarbosoft.coroutines](https://github.com/rendaw/java-coroutines).
 
-2017-: rendaw https://github.com/rendaw/coroutines
+2017-: rendaw https://github.com/rendaw/java-coroutines-core
 
 2013-2017: https://github.com/buzden/continuations
 

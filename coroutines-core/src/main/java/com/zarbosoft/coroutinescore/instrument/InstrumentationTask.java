@@ -39,10 +39,7 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.util.CheckClassAdapter;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -178,13 +175,16 @@ public class InstrumentationTask extends Task {
 		db.log(LogLevel.INFO, "Instrumenting class %s", f);
 
 		try {
-			ClassReader r;
+			if (verbose && check) {
+				System.out.println("PRE INSTRUMENTATION " + f);
+				final ClassReader cr = new ClassReader(new FileInputStream(f));
+				CheckClassAdapter.verify(cr, true, new PrintWriter(System.out));
+				System.out.println("END PRE INSTRUMENTATION " + f);
+			}
 
-			final FileInputStream fis = new FileInputStream(f);
-			try {
+			final ClassReader r;
+			try (final FileInputStream fis = new FileInputStream(f)) {
 				r = new ClassReader(fis);
-			} finally {
-				fis.close();
 			}
 
 			final ClassWriter cw = new DBClassWriter(db, r);
@@ -193,6 +193,12 @@ public class InstrumentationTask extends Task {
 			r.accept(ic, ClassReader.SKIP_FRAMES);
 
 			final byte[] newClass = cw.toByteArray();
+			if (verbose && check) {
+				System.out.println("POST INSTRUMENTATION " + f);
+				final ClassReader cr = new ClassReader(newClass);
+				CheckClassAdapter.verify(cr, true, new PrintWriter(System.out));
+				System.out.println("END POST INSTRUMENTATION " + f);
+			}
 
 			if (writeClasses) {
 				final FileOutputStream fos = new FileOutputStream(f);

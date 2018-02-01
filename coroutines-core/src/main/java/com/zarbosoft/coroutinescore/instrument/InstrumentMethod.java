@@ -37,7 +37,10 @@ import org.objectweb.asm.tree.*;
 import org.objectweb.asm.tree.analysis.*;
 
 import java.lang.reflect.InvocationTargetException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -174,73 +177,15 @@ public class InstrumentMethod {
 		if (suspensions.isEmpty())
 			return false;
 
-		// Split exception ranges around suspending nodes
-		// Modifies the instruction + try catch block node lists so done after initial scan
-		{
-			final ListIterator<TryCatchBlockNode> rangeListPosition = mn.tryCatchBlocks.listIterator();
-			while (rangeListPosition.hasNext()) {
-				final TryCatchBlockNode range = rangeListPosition.next();
-				final LabelNode originalEnd = range.end;
-				AbstractInsnNode at = range.start;
-
-				class AdjustRanges {
-					TryCatchBlockNode useBlock = range;
-					AbstractInsnNode start;
-					int nonMetaCount = 0;
-
-					public AdjustRanges(final AbstractInsnNode start) {
-						this.start = start;
-					}
-
-					public void finishRange(final AbstractInsnNode suspension) {
-						final LabelNode endLabel = new LabelNode();
-						mn.instructions.insertBefore(suspension, endLabel);
-						finishRange(endLabel);
-						start = suspension.getNext(); // skip suspension
-						nonMetaCount = 0;
-					}
-
-					public void finishRange(final LabelNode endLabel) {
-						if (useBlock == null) {
-							final LabelNode startLabel = new LabelNode();
-							mn.instructions.insertBefore(start, startLabel);
-							rangeListPosition.add(new TryCatchBlockNode(startLabel,
-									endLabel,
-									range.handler,
-									range.type
-							));
-						} else {
-							useBlock.end = endLabel;
-							useBlock = null;
-						}
-					}
-				}
-				final AdjustRanges adjustRanges = new AdjustRanges(at);
-
-				final Iterator<Suspension> suspendingPosition = suspensions.iterator();
-				while (at != originalEnd && suspendingPosition.hasNext()) {
-					final Suspension nextSuspension = suspendingPosition.next();
-
-					// Find the suspending node
-					for (; at != originalEnd; at = at.getNext()) {
-						if (isMetaInst(at))
-							continue;
-						if (at == nextSuspension.node)
-							break;
-						adjustRanges.nonMetaCount += 1;
-					}
-					if (at != nextSuspension.node)
-						break;
-
-					if (nextSuspension.isReflective) {
-						reflectExceptRanges.add(new TryCatchBlockNode(nextSuspension.reflectStart,
-								nextSuspension.reflectEnd,
-								nextSuspension.reflectExceptHandle,
-								Type.getInternalName(InvocationTargetException.class)
-						));
-					}
-				}
-			}
+		// Create catch blocks for handling reflective calls
+		for (final Suspension suspension : suspensions) {
+			if (!suspension.isReflective)
+				continue;
+			reflectExceptRanges.add(new TryCatchBlockNode(suspension.reflectStart,
+					suspension.reflectEnd,
+					suspension.reflectExceptHandle,
+					Type.getInternalName(InvocationTargetException.class)
+			));
 		}
 
 		return true;
@@ -260,12 +205,12 @@ public class InstrumentMethod {
 
 		mv.visitCode();
 
-		final Label lMethodStart = new Label();
+		final Label lMethodEntry = new Label();
 		final Label lMethodEnd = new Label();
 		final Label lCatchSEE = new Label();
 
 		// Output setup code
-		mv.visitTryCatchBlock(lMethodStart, lMethodEnd, lCatchSEE, CheckInstrumentationVisitor.EXCEPTION_NAME);
+		mv.visitTryCatchBlock(lMethodEntry, lMethodEnd, lCatchSEE, CheckInstrumentationVisitor.EXCEPTION_NAME);
 
 		for (final TryCatchBlockNode tcb : reflectExceptRanges) {
 			tcb.accept(mv);
@@ -297,24 +242,31 @@ public class InstrumentMethod {
 		}
 
 		final Label lCatchAll = new Label();
-		mv.visitTryCatchBlock(lMethodStart, lMethodEnd, lCatchAll, null);
+		mv.visitTryCatchBlock(lMethodEntry, lMethodEnd, lCatchAll, null);
 
 		mv.visitMethodInsn(Opcodes.INVOKESTATIC, STACK_NAME, "getStack", "()L" + STACK_NAME + ";");
 		mv.visitInsn(Opcodes.DUP);
 		mv.visitVarInsn(Opcodes.ASTORE, lvarStack);
 
 		mv.visitMethodInsn(INVOKEVIRTUAL, STACK_NAME, "nextMethodEntry", "()I");
-		final Label[] lMethodCalls = new Label[suspensions.size()];
+		final Label[] lResumeEntries = new Label[suspensions.size()];
 		for (int i = 0; i < suspensions.size(); ++i) {
-			lMethodCalls[i] = new Label();
+			final Suspension suspension = suspensions.get(i);
+			lResumeEntries[i] = suspension.restoreStart;
 		}
 		mv.visitTableSwitchInsn(1,
 				suspensions.size(),
-				lMethodStart,
-				lMethodCalls
+				lMethodEntry,
+				lResumeEntries
 		); // 0 is the default value, so skip it
 
-		mv.visitLabel(lMethodStart);
+		for (final Suspension suspension : suspensions) {
+			mv.visitLabel(suspension.restoreStart);
+			emitRestoreState(mv, suspension);
+			mv.visitJumpInsn(GOTO, suspension.restoreContinue);
+		}
+
+		mv.visitLabel(lMethodEntry);
 
 		// Output body + suspend/resumes
 		class OutputNodesBetween {
@@ -383,6 +335,7 @@ public class InstrumentMethod {
 
 			final MethodInsnNode min = (MethodInsnNode) suspension.node;
 			emitStoreState(mv, i + 1, suspension);
+			emitRestoreStack(mv, suspension);
 			if (InstrumentClass.COROUTINE_NAME.equals(min.owner) && "yield".equals(min.name)) {
 				// Direct call to Coroutine.yield
 				// Replace with custom instructions
@@ -395,14 +348,14 @@ public class InstrumentMethod {
 						CheckInstrumentationVisitor.EXCEPTION_DESC
 				);
 				mv.visitInsn(ATHROW);
-				mv.visitLabel(lMethodCalls[i]);
-				emitRestoreState(mv, suspension);
+				mv.visitInsn(NOP);
+				mv.visitLabel(suspension.restoreContinue);
 				outputLast = outputLast.getNext();
 			} else {
 				// Suspendable method
 				// Reenter the method upon resuming
-				mv.visitLabel(lMethodCalls[i]);
-				emitRestoreState(mv, suspension);
+				mv.visitInsn(NOP);
+				mv.visitLabel(suspension.restoreContinue);
 				outputLast = outputLast.getNext();
 				if (suspension.isReflective)
 					mv.visitLabel(suspension.reflectStart.getLabel());
@@ -541,6 +494,21 @@ public class InstrumentMethod {
 		}
 	}
 
+	public void emitRestoreStack(final MethodVisitor mv, final Suspension fi) {
+		for (int i = 0; i < fi.frame.getStackSize(); i++) {
+			final BasicValue v = (BasicValue) fi.frame.getStack(i);
+			if (!isOmitted(v)) {
+				if (!isNullType(v)) {
+					final int slotIdx = fi.stackSlotIndices[i];
+					assert slotIdx >= 0 && slotIdx < fi.numSlots;
+					emitRestoreValue(mv, v, lvarStack, slotIdx);
+				} else {
+					mv.visitInsn(Opcodes.ACONST_NULL);
+				}
+			}
+		}
+	}
+
 	private void emitRestoreState(final MethodVisitor mv, final Suspension fi) {
 		for (int i = firstLocal; i < fi.frame.getLocals(); i++) {
 			final BasicValue v = (BasicValue) fi.frame.getLocal(i);
@@ -555,18 +523,7 @@ public class InstrumentMethod {
 			}
 		}
 
-		for (int i = 0; i < fi.frame.getStackSize(); i++) {
-			final BasicValue v = (BasicValue) fi.frame.getStack(i);
-			if (!isOmitted(v)) {
-				if (!isNullType(v)) {
-					final int slotIdx = fi.stackSlotIndices[i];
-					assert slotIdx >= 0 && slotIdx < fi.numSlots;
-					emitRestoreValue(mv, v, lvarStack, slotIdx);
-				} else {
-					mv.visitInsn(Opcodes.ACONST_NULL);
-				}
-			}
-		}
+		emitRestoreStack(mv, fi);
 	}
 
 	private void emitStoreValue(
@@ -677,10 +634,12 @@ public class InstrumentMethod {
 		final int[] localSlotIndices;
 		final int[] stackSlotIndices;
 		final boolean isReflective;
-		LabelNode reflectStart;
-		LabelNode reflectEnd;
-		LabelNode reflectExceptHandle;
-		LabelNode reflectContinue;
+		final Label restoreStart;
+		final Label restoreContinue;
+		final LabelNode reflectStart;
+		final LabelNode reflectEnd;
+		final LabelNode reflectExceptHandle;
+		final LabelNode reflectContinue;
 
 		Suspension(
 				final Frame f,
@@ -693,11 +652,18 @@ public class InstrumentMethod {
 			this.frame = f;
 			this.node = node;
 			this.isReflective = isReflective;
+			restoreStart = new Label();
+			restoreContinue = new Label();
 			if (isReflective) {
 				reflectStart = new LabelNode();
 				reflectEnd = new LabelNode();
 				reflectExceptHandle = new LabelNode();
 				reflectContinue = new LabelNode();
+			} else {
+				reflectStart = null;
+				reflectEnd = null;
+				reflectExceptHandle = null;
+				reflectContinue = null;
 			}
 
 			int idxObj = 0;
