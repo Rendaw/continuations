@@ -18,7 +18,6 @@ def replace(path, *replacements):
     temp = '{}.1'.format(path)
     with open(temp, 'w') as dest:
         dest.write(text)
-    print(text)
     shutil.move(temp, path)
 
 

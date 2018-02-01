@@ -8,7 +8,7 @@ Source mapping isn't affected by coroutine instrumentation so debugging and trac
 
 Coroutines are serializable.
 
-This package barebones.  I hope that more fully-featured toolkits and integrations with libraries such as Xnio can use this as a base, and if a better implementation comes out by keeping this small it will be easy to replace.  My recommended extension is [com.zarbosoft.coroutines](https://github.com/rendaw/java-coroutines).
+This package is barebones.  I hope that more fully-featured toolkits and integrations with libraries such as Xnio can use this as a base, and if a better implementation comes out by keeping this small it will be easy to replace.  My recommendation is [com.zarbosoft.coroutines](https://github.com/rendaw/java-coroutines).
 
 # Maven
 
@@ -16,7 +16,7 @@ This package barebones.  I hope that more fully-featured toolkits and integratio
 <dependency>
     <groupId>com.zarbosoft</groupId>
     <artifactId>coroutines-core</artifactId>
-    <version>0.0.8</version>
+    <version>0.0.9</version>
 </dependency>
 ```
 
@@ -73,11 +73,11 @@ Classes and methods that can be suspended need to be instrumented.  This can eit
 
 **Compile time** instrumentation is simpler since it has fewer moving parts and you can troubleshoot any assembly issues before distribution.  It also may improve startup times slightly.
 
-**Runtime instrumentation** is more flexible - it can deal with code hotswaps and Maven build environments that can't use the Ant instrumentation task, but you need to pass the agent as a JVM argument whenever you execute the code.
+**Runtime instrumentation** is more flexible - it can deal with code hotswaps and build environments that can't use the Ant instrumentation task, but you need to pass the agent as a JVM argument whenever you execute the code.
 
 Compile and runtime instrumentation can be mixed, so you can use preinstrumented classes with the runtime agent.
 
-I suggest compile-time libraries you are distributing since it makes downstream compile time instrumentation simpler.
+I suggest compile-time instrumenting libraries you are distributing since it makes downstream compile time instrumentation simpler.
 
 ## Compile-time instrumentation
 
@@ -184,7 +184,7 @@ Since it's easiest to unpack and instrument everything, I'll demonstrate that. A
         <dependency>
             <groupId>com.zarbosoft</groupId>
             <artifactId>coroutines-core</artifactId>
-            <version>0.0.8</version>
+            <version>0.0.9</version>
         </dependency>
     </dependencies>
     <executions>
@@ -223,7 +223,7 @@ If the coroutines-core jar is in your classpath 1 and 2 are complete and all you
 For example, with maven:
 
 ```
-java -javaagent:/home/you/.m2/repository/com/zarbosoft/coroutines-core/coroutines-core-0.0.8.jar -jar myjar.jar
+java -javaagent:/home/you/.m2/repository/com/zarbosoft/coroutines-core/coroutines-core-0.0.9.jar -jar myjar.jar
 ```
 
 #### Verbose output
@@ -231,7 +231,7 @@ java -javaagent:/home/you/.m2/repository/com/zarbosoft/coroutines-core/coroutine
 Add the option `=v` after the jar:
 
 ```
-java -javaagent:/home/you/.m2/repository/com/zarbosoft/coroutines-core/coroutines-core-0.0.8.jar=v -jar myjar.jar
+java -javaagent:/home/you/.m2/repository/com/zarbosoft/coroutines-core/coroutines-core-0.0.9.jar=v -jar myjar.jar
 ```
 
 #### Bytecode verification
@@ -239,14 +239,14 @@ java -javaagent:/home/you/.m2/repository/com/zarbosoft/coroutines-core/coroutine
 Add the option `=c` after the jar:
 
 ```
-java -javaagent:/home/you/.m2/repository/com/zarbosoft/coroutines-core/coroutines-core-0.0.8.jar=c -jar myjar.jar
+java -javaagent:/home/you/.m2/repository/com/zarbosoft/coroutines-core/coroutines-core-0.0.9.jar=c -jar myjar.jar
 ```
 
 Flags can be combined, like `=cv` for verbose output and bytecode verification.
 
 #### Instrumenting test classes
 
-This is an alternative to compile-time test class instrumentation.  Add the following to your `pom.xml`:
+Add the following to your `pom.xml`:
 
 ```
 <plugin>
@@ -283,7 +283,7 @@ It's also possible to install the agent into the classloader programmatically bu
 1. Before every suspendable call, the coroutine state (local variables, stack variables) are saved to a thread-local `Stack` object.
 2. `Coroutine.yield()` records the position (instruction index) then raises `SuspendException`.  The stack unwinds normally back to the method that called `coroutine.run`, where normal flow continues.  The stack before yielding is still stored in the coroutine's `Stack`.
 3. Instrumentation adds a jump table to each suspendable call to each suspendable method.
-4. Resuming the coroutine calls the root function again.  Each function restores the latest state from the `Stack` and jumps back to where it was.  If a method call was suspended, the method is re-entered and it repeates the stack restore and jump.  The final method's jump table moves the instruction pointer to directly after the `yield` call.
+4. Resuming the coroutine calls the root function again.  Each function restores the latest state from the `Stack` and jumps to the point it suspended.  If a method call was suspended, the method is re-entered and the process repeats.  The final method jumps to directly after the `yield` call.
 
 # History
 
