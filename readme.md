@@ -142,9 +142,9 @@ Change the `fileset` to
 
 and `phase` to `test-compile`.
 
-#### Dealing with uninstrumented dependencies
+#### Dealing with uninstrumented suspendable dependencies
 
-There's no easy way to do this, but the following works alright.  Basically:
+Hopefully this shouldn't happen often.  If you don't care about compile time instrumentation, using runtime instrumentation will work fine.  Otherwise, there's no simple way to do this but the following works alright.  Basically:
 
 * Unpack the dependencies that need to be instrumented (or all of them) into your classes directory
 * Instrument everything
