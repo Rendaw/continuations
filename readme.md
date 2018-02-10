@@ -173,6 +173,11 @@ Since it's easiest to unpack and instrument everything, I'll demonstrate that. A
             <configuration>
                 <outputDirectory>${project.build.directory}/classes</outputDirectory>
                 <includeScope>runtime</includeScope>
+		<!--
+			Signatures broke my jar - got the unhelpful error
+			"Could not find or load main class ..."
+		-->
+		<excludes>META-INF/*.DSA,META-INF/*.SF</excludes>
             </configuration>
         </execution>
     </executions>
