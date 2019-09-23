@@ -168,7 +168,7 @@
     </dependencies>
     <profiles>
         <profile>
-            <id>release</id>
+            <id>prerelease</id>
             <build>
                 <plugins>
                     <plugin>
@@ -178,7 +178,7 @@
                         <configuration>
                             <archive>
                                 <manifestEntries>
-                                    <Built-By></Built-By>
+                                    <Built-By/>
                                 </manifestEntries>
                             </archive>
                         </configuration>
@@ -194,11 +194,12 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
-                        <version>2.9.1</version>
+                        <version>3.0.1</version>
                         <configuration>
+                            <source>1.8</source>
                             <archive>
                                 <manifestEntries>
-                                    <Built-By></Built-By>
+                                    <Built-By/>
                                 </manifestEntries>
                             </archive>
                         </configuration>
@@ -211,6 +212,13 @@
                             </execution>
                         </executions>
                     </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
@@ -225,7 +233,7 @@
                             </execution>
                         </executions>
                         <configuration>
-                            <keyname>6BCEF033E4F4B3249D39EAB8C4D1C55B9F0D7F77</keyname>
+                            <keyname>42439C055D7D7C9D056A5648BF6FAF8B3E8AF437</keyname>
                         </configuration>
                     </plugin>
                     <plugin>
