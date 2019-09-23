@@ -47,6 +47,7 @@ public class TypeInterpreter extends BasicInterpreter {
 	private final MethodDatabase db;
 
 	public TypeInterpreter(final MethodDatabase db) {
+	  super(ASM7);
 		this.db = db;
 	}
 
