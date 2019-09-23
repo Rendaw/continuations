@@ -16,7 +16,7 @@ This package is barebones.  I hope that more fully-featured toolkits and integra
 <dependency>
     <groupId>com.zarbosoft</groupId>
     <artifactId>coroutines-core</artifactId>
-    <version>0.0.9</version>
+    <version>0.0.10</version>
 </dependency>
 ```
 
@@ -189,7 +189,7 @@ Since it's easiest to unpack and instrument everything, I'll demonstrate that. A
         <dependency>
             <groupId>com.zarbosoft</groupId>
             <artifactId>coroutines-core</artifactId>
-            <version>0.0.9</version>
+            <version>0.0.10</version>
         </dependency>
     </dependencies>
     <executions>
