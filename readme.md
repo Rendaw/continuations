@@ -2,7 +2,7 @@
 
 Coroutines are methods that can be stopped at any place within and then resumed from that point.  They are often used as lightweight threads, switching between activities in a single thread when an activity needs to wait for something like disk reads or network data to arrive.
 
-Now supports Java 9!
+Now supports Java 11!
 
 Source mapping isn't affected by coroutine instrumentation so debugging and trace line numbers should operate as normal.
 
